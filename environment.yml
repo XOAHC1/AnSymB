@@ -1,0 +1,9 @@
+name: ansymb
+channels: 
+- conda-forge
+- default
+dependencies:
+- python=3.11.9
+- numpy
+- pandas
+- matplotlib
