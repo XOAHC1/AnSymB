@@ -2,12 +2,23 @@ sole_data_path = "subject_data\sole-data";
 vr_data_path = "subject_data\vr_data";
 
 n_subjects = 21;
-subject = 2;
+subject = 3;
+conditions = ["br", "bvr", "vw", "w", "h", "vh"];
+condition = "br";
 
-% subject_sole_data = importdata(sole_data_path + "\" + subject + "\loadapp_2025-12-09_11-14-25-548.load_ASCII");
+subject_data_path = sole_data_path + "\" + subject;
 
-% print(subject_sole_data)
+% for condition = conditions
+%     data_path = subject_data_path + "\" + condition +".txt";
+%     data = readtable(data_path);
+% end
 
-test = importdata("subject_data\sole-data\1\loadapp_2025-12-09_11-03-20-499.load_ASCII.txt").textdata;
 
-condition = test(2)
+data_path = subject_data_path + "\" + condition +".txt";
+T = readtable(data_path);
+
+time = T{:, 1};
+right_total = T{:, 5};
+left_total = T{:, 7};
+
+plot(time, [right_total, left_total])
