@@ -16,7 +16,7 @@ function condition_sole_data = read_condition_sole_data(subject, condition)
 
     % Data Format:
     %     1   , 2     , 3     , 4     , 5     , 6     , 7     , 8     , 9     , 10    , 11
-    %     Time, R-heel, R-mid, R-front, R-total, Time, L-total, L-front, L-mid, L-heel, Time
+    %     Time, R-front, R-mid, R-heel, R-total, Time, L-total, L-heel, L-mid, L-front, Time
     % 
     % Data is also accessable by collumn headers. Thoose change depending on the soles used, therefore access via index is to be preferred.
     data_path = "subject_data\sole-data\" + subject + "\" + condition +".txt";
@@ -81,16 +81,16 @@ function plot_sole_data(subject, condition)
 
     % ---- Column indices (based on your format) ----
     tR = data{:,1};     % Right foot time
-    R_heel  = data{:,2};
+    R_front  = data{:,2};
     R_mid   = data{:,3};
-    R_front = data{:,4};
+    R_heel = data{:,4};
     R_total = data{:,5};
 
     tL = data{:,6};     % Left foot time
     L_total = data{:,7};
-    L_front = data{:,8};
+    L_heel = data{:,8};
     L_mid   = data{:,9};
-    L_heel  = data{:,10};
+    L_front  = data{:,10};
 
     % ---- Plot ----
     figure('Name', subject + " - " + condition, 'Color', 'w');
@@ -119,14 +119,20 @@ end
 
 % get individual trials
 function trials = seperate_trials(condition_sole_data)
-    % return array of individual trials, only way there included
+    % return sturct of individual trials
 
     % Notes to stump signal:
     % no rolling pattern
     % slower than step
     % more force in mid-foot than usual
     
-    
+    trials = struct();
+
+
+end
+
+function stamps = find_stamps(condition_data)
+    % spatial_simultanity = ;
 end
 
 %% Testing
