@@ -16,7 +16,7 @@ function condition_sole_data = read_condition_sole_data(subject, condition)
 
     % Data Format:
     %     1   , 2     , 3     , 4     , 5     , 6     , 7     , 8     , 9     , 10    , 11
-    %     Time, R-front, R-mid, R-heel, R-total, Time, L-total, L-heel, L-mid, L-front, Time
+    %     Time, R-front, R-mid, R-heel, R-total, Time, L-heel, L-mid, L-front, L-total, Time
     % 
     % Data is also accessable by collumn headers. Thoose change depending on the soles used, therefore access via index is to be preferred.
     data_path = "subject_data\sole-data\" + subject + "\" + condition +".txt";
@@ -87,10 +87,11 @@ function plot_sole_data(subject, condition)
     R_total = data{:,5};
 
     tL = data{:,6};     % Left foot time
-    L_total = data{:,7};
-    L_heel = data{:,8};
-    L_mid   = data{:,9};
-    L_front  = data{:,10};
+    L_heel = data{:,7};
+    L_mid   = data{:,8};
+    L_front  = data{:,9};
+    L_total = data{:,10};
+
 
     % ---- Plot ----
     figure('Name', subject + " - " + condition, 'Color', 'w');
@@ -131,12 +132,96 @@ function trials = seperate_trials(condition_sole_data)
 
 end
 
-function stamps = find_stamps(condition_data)
-    % spatial_simultanity = ;
+
+function steps = get_steps(condition_data)
+
+    steps = struct([]);
+    
+    % extract relevant data from data
+    t = condition_data{:, 1};
+    right = condition_data{:, 5};
+    % left = condition_data{:, 10};
+
+    % determin contact phases
+    cf = 0.05; % contact factor
+    th_r = cf * max(right);
+    % th_l = cf * max(left);
+    
+    r_in_contact = right > th_r;
+    % l_in_contact = left > th_l;
+
+    % find connected components in sole data (aka steps)
+    r_edges = diff([false; r_in_contact;false]);
+    % l_edges = diff([false; l_in_contact; false]);
+
+    % first and Last in contact indices
+    r_onsets  = find(r_edges == 1);
+    r_offsets = find(r_edges == -1) - 1; 
+
+    % extract steps from data
+    nEvents = numel(r_onsets);
+            
+    for i = 1:nEvents
+        idx = r_onsets(i):r_offsets(i);
+
+        t_evt = t(idx);
+        heel  = condition_data{idx,2};
+        mid   = condition_data{idx,3};
+        front = condition_data{idx,4};
+        tot   = condition_data{idx, 5};
+
+        % Peak times
+        [~,mih] = max(heel);
+        [~,mim] = max(mid);
+        [~,mif] = max(front);
+
+        steps(i).rolling = ...
+            max([t_evt(mih), t_evt(mim), t_evt(mif)]) - ...
+            min([t_evt(mih), t_evt(mim), t_evt(mif)]);
+
+        % Rise slope
+        dt = mean(diff(t_evt));
+        steps(i).maxSlope = max(diff(tot)) / dt;
+
+        % Contact duration
+        steps(i).duration = t_evt(end) - t_evt(1);
+
+        % peak time
+        [~, peakIndex] = max(tot);
+        steps(i).peakTime = t_evt(peakIndex);
+    end
+end
+
+% identify stamps in struct of steps
+function stamps = get_stamps(steps)
+
+    nSteps = numel(steps)
+    
+    ROLLING_TH = 0.08;   % seconds
+    SLOPE_TH   = 3000;   % pressure / s
+    DUR_TH     = 0.25;   % seconds
+
+    mark_stamps = true;
+    for i = 1:nSteps
+        steps(i).isStamp = ...
+            steps(i).rolling < ROLLING_TH && ...
+            steps(i).maxSlope > SLOPE_TH && ...
+            steps(i).duration < DUR_TH;
+    end
+
+    if mark_stamps
+        figure; plot(t, total); hold on
+        for i = 1:nEvents
+            if steps(i).isStamp
+                xline(t(onsets(i)), 'r', 'LineWidth', 1.5);
+            end
+        end
+    end
+
 end
 
 %% Testing
 
-plot_sole_data(3, "h")
-
-
+data = read_condition_sole_data(3, "h");
+test = get_steps(data);
+% stamps = get_stamps(test);
