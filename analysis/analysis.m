@@ -16,7 +16,7 @@ function condition_sole_data = read_condition_sole_data(subject, condition)
 
     % Data Format:
     %     1   , 2     , 3     , 4     , 5     , 6     , 7     , 8     , 9     , 10    , 11
-    %     Time, R-front, R-mid, R-heel, R-total, Time, L-heel, L-mid, L-front, L-total, Time
+        % Time, R-front, R-mid, R-heel, R-total, Time, L-heel, L-mid, L-front, L-total, Time
     % 
     % Data is also accessable by collumn headers. Thoose change depending on the soles used, therefore access via index is to be preferred.
     data_path = "subject_data\sole-data\" + subject + "\" + condition +".txt";
@@ -45,56 +45,37 @@ function subject_sole_data = read_subject_sole_data(subject)
     end
 end
 
-% Read in all sole data
-% function complete_sole_data = read_all_sole_data()
 
-%     N_SUBJECTS = 21;
-%     complete_sole_data = struct();
-
-%     for s = 1:N_SUBJECTS
-%         complete_sole_data.(s) = read_subject_sole_data(s);
-%     end
-% end
-
-% Analysis functions
-
-function plot_sole_data(subject, condition)
-%PLOT_SOLE_DATA Plot sole pressure data for a subject and condition
+function plot_sole_data(data, plotLabel)
+%PLOT_SOLE_DATA Plot sole pressure data from a table
 %
-%   plot_sole_data("S01", "br")
+%   plot_sole_data(data)
+%   plot_sole_data(data, "S01 - br")
 
-    % Read all data for subject
-    subject_sole_data = read_subject_sole_data(subject);
-
-    % Check condition exists
-    if ~isfield(subject_sole_data, condition)
-        error("Condition '%s' does not exist.", condition);
+    % ---- Input checks ----
+    if nargin < 1 || isempty(data)
+        error("Input data must be a non-empty table.");
     end
 
-    data = subject_sole_data.(condition);
-
-    % Handle missing / empty data
-    if isempty(data)
-        warning("No data available for subject %s, condition %s.", subject, condition);
-        return
+    if nargin < 2
+        plotLabel = "";
     end
 
     % ---- Column indices (based on your format) ----
     tR = data{:,1};     % Right foot time
-    R_front  = data{:,2};
+    R_front = data{:,2};
     R_mid   = data{:,3};
-    R_heel = data{:,4};
+    R_heel  = data{:,4};
     R_total = data{:,5};
 
     tL = data{:,6};     % Left foot time
-    L_heel = data{:,7};
+    L_heel  = data{:,7};
     L_mid   = data{:,8};
-    L_front  = data{:,9};
+    L_front = data{:,9};
     L_total = data{:,10};
 
-
     % ---- Plot ----
-    figure('Name', subject + " - " + condition, 'Color', 'w');
+    figure('Name', plotLabel, 'Color', 'w');
 
     tiledlayout(2,1,"TileSpacing","compact")
 
@@ -118,6 +99,7 @@ function plot_sole_data(subject, condition)
 
 end
 
+
 % get individual trials
 function trials = seperate_trials(condition_sole_data)
     % return sturct of individual trials
@@ -132,9 +114,14 @@ function trials = seperate_trials(condition_sole_data)
 
 end
 
-
 function steps = get_steps(condition_data)
+    mark_steps = true;
 
+    % Fields in Output:
+        % rolling
+        % max slope
+        % duration
+        % peakTime
     steps = struct([]);
     
     % extract relevant data from data
@@ -171,13 +158,20 @@ function steps = get_steps(condition_data)
         tot   = condition_data{idx, 5};
 
         % Peak times
-        [~,mih] = max(heel);
-        [~,mim] = max(mid);
-        [~,mif] = max(front);
+        [max_h ,mih] = max(heel);
+        [max_m ,mim] = max(mid);
+        [max_f ,mif] = max(front);
 
+        % rolling
         steps(i).rolling = ...
-            max([t_evt(mih), t_evt(mim), t_evt(mif)]) - ...
-            min([t_evt(mih), t_evt(mim), t_evt(mif)]);
+            max(abs( ...
+                [t_evt(mih), t_evt(mih), t_evt(mim)] - ...
+                [t_evt(mim), t_evt(mif), t_evt(mif)] ...
+            ));
+
+        % partial force relative to total at maximum
+        steps(i).heelPropAtMax = max_h / tot(mih);
+        steps(i).forntPropAtMax = max_f / tot(mif);
 
         % Rise slope
         dt = mean(diff(t_evt));
@@ -190,32 +184,46 @@ function steps = get_steps(condition_data)
         [~, peakIndex] = max(tot);
         steps(i).peakTime = t_evt(peakIndex);
     end
+
 end
 
 % identify stamps in struct of steps
-function stamps = get_stamps(steps)
+function get_stamps(steps, condition_data)
 
-    nSteps = numel(steps)
+    % fields in return:
+        % stamp index in steps array
+
+    t = condition_data{:, 1};
+    total = condition_data{:, 5};
+
+    % stamps = struct([]);
+    nSteps = numel(steps);
     
-    ROLLING_TH = 0.08;   % seconds
-    SLOPE_TH   = 3000;   % pressure / s
-    DUR_TH     = 0.25;   % seconds
+    ROLLING_TH = 0.08 * 5;   % seconds
+    SLOPE_TH   = 3000 / 6;   % pressure / s
+    DUR_TH     = 0.25 * 20;   % seconds
+    MAX_H_TH   = 0.5  * 1;  
+    % MAX_F_TH   = 
 
     mark_stamps = true;
     for i = 1:nSteps
         steps(i).isStamp = ...
-            steps(i).rolling < ROLLING_TH && ...
-            steps(i).maxSlope > SLOPE_TH && ...
-            steps(i).duration < DUR_TH;
+            steps(i).heelPropAtMax < MAX_H_TH;% && ...
+            % steps(i).maxSlope > SLOPE_TH && ...
+            % steps(i).duration < DUR_TH;
     end
-
+    nStamp = 0;
     if mark_stamps
         figure; plot(t, total); hold on
-        for i = 1:nEvents
+        for i = 1:nSteps
             if steps(i).isStamp
-                xline(t(onsets(i)), 'r', 'LineWidth', 1.5);
+                % s = i
+                nStamp = nStamp + 1
+                x = steps(i).heelPropAtMax
+                plot(steps(i).peakTime, 500, "Color", "red", "Marker", "diamond");
             end
         end
+        legend()
     end
 
 end
@@ -224,4 +232,6 @@ end
 
 data = read_condition_sole_data(3, "h");
 test = get_steps(data);
-% stamps = get_stamps(test);
+% get_stamps(test, data);
+
+plot_sole_data(data)
