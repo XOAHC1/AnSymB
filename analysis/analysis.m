@@ -136,124 +136,98 @@ function trials = seperate_trials(condition_sole_data)
 
 end
 
-function steps = get_steps(condition_data)
-    mark_steps = true;
+function steps_side = get_steps_one_side(t, heel, mid, front, total)
 
-    % Fields in Output:
-        % rolling
-        % max slope
-        % duration
-        % peakTime
-    steps = struct();
+    % find individual steps
+    steps_side = struct([]);
 
-    steps.right = struct([]);
-    steps.left = struct([]);
-    
-    % extract relevant data from data
-    t = condition_data{:, 1};
-    right = condition_data{:, 5};
-    left = condition_data{:, 10};
+    cf = 0.05;
+    th_c = cf * max(total);
 
-    % determin contact phases
-    cf = 0.05; % contact factor
-    th_r = cf * max(right);
-    th_l = cf * max(left);
-    
-    r_in_contact = right > th_r;
-    l_in_contact = left > th_l;
+    in_contact = total > th_c;
 
-    % find connected components in sole data (aka steps)
-    r_edges = diff([false; r_in_contact;false]);
-    l_edges = diff([false; l_in_contact; false]);
+    edges = diff([false; in_contact; false]);
 
     % first and Last in contact indices
-    r_onsets  = find(r_edges == 1);
-    r_offsets = find(r_edges == -1) - 1; 
-
-    l_onsets = find(l_edges == 1);
-    l_offsets = find(l_edges == -1) - 1;
+    onsets  = find(edges == 1);
+    offsets = find(edges == -1) - 1; 
 
     % extract steps from data
-    nEvents_r = numel(r_onsets);
-    nEvents_l = numel(l_onsets);
+    nEvents = numel(onsets);
 
-  
-    for i = 1:nEvents_r
-        idx = r_onsets(i):r_offsets(i);
+    % prep for rolling
+    x_h = 0;
+    x_m = 0.5;
+    x_f = 1;
 
+    for i = 1:nEvents
+        % seperate individual steps
+        idx = onsets(i):offsets(i);
         t_evt = t(idx);
-        heel  = condition_data{idx,4};
-        mid   = condition_data{idx,3};
-        front = condition_data{idx,2};
-        tot   = condition_data{idx, 5};
+
+        tot = total(idx);
+        h = heel(idx);
+        m = mid(idx);
+        f = front(idx);
 
         % Peak times
-        [max_h ,mih] = max(heel);
-        [max_m ,mim] = max(mid);
-        [max_f ,mif] = max(front);
-
-        % rolling
-        steps.right(i).rolling = ...
-            max(abs( ...
-                [t_evt(mih), t_evt(mih), t_evt(mim)] - ...
-                [t_evt(mim), t_evt(mif), t_evt(mif)] ...
-            ));
+        [max_h ,mih] = max(h);
+        [max_m ,mim] = max(m);
+        [max_f ,mif] = max(f);
+        [peakForce, peakIndex] = max(tot);
 
         % partial force relative to total at maximum
-        steps.right(i).heelPropAtMax = max_h / tot(mih);
-        steps.right(i).frontPropAtMax = max_f / tot(mif);
+        steps_side(i).heelPropAtMax = max_h / tot(mih);
+        steps_side(i).frontPropAtMax = max_f / tot(mif);
 
         % Rise slope
         dt = mean(diff(t_evt));
-        steps.right(i).maxSlope = max(diff(tot)) / dt;
+        steps_side(i).maxSlope = max(diff(tot)) / dt;
 
         % Contact duration
-        steps.right(i).duration = t_evt(end) - t_evt(1);
+        steps_side(i).duration = t_evt(end) - t_evt(1);
 
         % peak time
-        [~, peakIndex] = max(tot);
-        steps.right(i).peakTime = t_evt(peakIndex);
-    end
-
-    % same for the left side
-    for i = 1:nEvents_l
-        idx = l_onsets(i):l_offsets(i);
-
-        t_evt = t(idx);
-        heel  = condition_data{idx,7};
-        mid   = condition_data{idx,8};
-        front = condition_data{idx,9};
-        tot   = condition_data{idx, 10};
-
-        % Peak times
-        [max_h ,mih] = max(heel);
-        [max_m ,mim] = max(mid);
-        [max_f ,mif] = max(front);
+        steps_side(i).peakTime = t_evt(peakIndex);
+        steps_side(i).peakForce = peakForce;
 
         % rolling
-        steps.left(i).rolling = ...
-            max(abs( ...
-                [t_evt(mih), t_evt(mih), t_evt(mim)] - ...
-                [t_evt(mim), t_evt(mif), t_evt(mif)] ...
-            ));
+        % COP computation
+        cop = (h * x_h + m * x_m + f * x_f) ./ tot;
 
-        % partial force relative to total at maximum
-        steps.left(i).heelPropAtMax = max_h / tot(mih);
-        steps.left(i).frontPropAtMax = max_f / tot(mif);
+        % COP forward velocity
+        dt = mean(diff(t));
+        cop_vel = diff(cop) / dt;
 
-        % Rise slope
-        dt = mean(diff(t_evt));
-        steps.left(i).maxSlope = max(diff(tot)) / dt;
+        % Rolling metric: COP smoothness
+        steps_side(i).rolling = (mean(cop_vel));
 
-        % Contact duration
-        steps.left(i).duration = t_evt(end) - t_evt(1);
-
-        % peak time
-        [~, peakIndex] = max(tot);
-        steps.left(i).peakTime = t_evt(peakIndex);
     end
+
 end
 
+function steps = get_steps(condition_data)
+    
+    % extract Data
+    time  = condition_data{:, 1};
+    % right side
+    front_r = condition_data{:, 2};
+    mid_r = condition_data{:, 3};
+    heel_r = condition_data{:, 4};
+    total_r = condition_data{:, 5};
+    % left side
+    front_l = condition_data{:, 9};
+    mid_l = condition_data{:, 8};
+    heel_l = condition_data{:, 7};
+    total_l = condition_data{:, 10}; 
+    
+    % initialise structure
+    steps = struct();
+
+    steps.right = get_steps_one_side(time, heel_r, mid_r, front_r, total_r);
+    steps.left = get_steps_one_side(time, heel_l, mid_l, front_l, total_l);
+     
+end
 
 % identify stamps in struct of steps
 function get_stamps(steps_total, condition_data)
@@ -299,4 +273,4 @@ data = read_condition_sole_data(3, "h");
 steps = get_steps(data);
 plot_sole_data(data);
 
-get_stamps(steps, data);
+% get_stamps(steps, data);
