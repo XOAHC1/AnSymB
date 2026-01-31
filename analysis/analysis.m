@@ -19,22 +19,31 @@ function condition_sole_data = read_condition_sole_data(subject, condition)
         % Time, R-front, R-mid, R-heel, R-total, Time, L-heel, L-mid, L-front, L-total, Time
     % 
     % Data is also accessable by collumn headers. Thoose change depending on the soles used, therefore access via index is to be preferred.
+
+    condition_sole_data = struct();
+
     data_path = "subject_data\sole-data\" + subject + "\" + condition +".txt";
     
     try
-        condition_sole_data = readtable(data_path);
-    catch ME
-        % Warn but do not stop execution
-        % warning("Missing or unreadable file for subject %s, condition %s.\n%s", ...
-        % subject, cond, ME.message);
-        
+        data = readtable(data_path);
+    catch ME 
         % Placeholder for missing data
-        condition_sole_data = table(); % empty table
+        data = table(); % empty table
     end 
+
+    condition_sole_data.data = data;
+    condition_sole_data.steps = get_steps(data);
+
 end
 
 % Read in sole data from all trials by one subject
 function subject_sole_data = read_subject_sole_data(subject)
+
+    % nice structure:
+    %  20       6       10
+    % subject.condition.trial
+    %                  .steps
+    %                  . 
 
     CONDITIONS = ["br", "bvr", "vw", "w", "h", "vh"];
     subject_sole_data = struct();
@@ -230,13 +239,14 @@ function steps = get_steps(condition_data)
 end
 
 % identify stamps in struct of steps
-function get_stamps(steps_total, condition_data)
+function stamps = get_stamps(steps, condition_data)
 
-    steps = steps_total.right;
-    t = condition_data.Var1;
-    total = condition_data{:, 5};
+    get_steps_one_side(steps.right, time, right)
+end
 
-    nSteps = numel(steps);
+function stamps_side = get_stamps_one_side(steps_side, time, total)
+
+    nSteps = numel(steps_side);
     
     ROLLING_TH = 0.08 * 5;   % seconds
     SLOPE_TH   = 3000 / 6;   % pressure / s
@@ -251,9 +261,10 @@ function get_stamps(steps_total, condition_data)
             % steps(i).maxSlope > SLOPE_TH && ...
             % steps(i).duration < DUR_TH;
     end
+
     nStamp = 0;
     if mark_stamps
-        figure; plot(t, total); hold on
+        figure; plot(time, total); hold on
         for i = 1:nSteps
             if steps(i).isStamp
                 % s = i
@@ -269,8 +280,6 @@ end
 
 %% Testing
 
-data = read_condition_sole_data(3, "h");
-steps = get_steps(data);
-plot_sole_data(data);
+s_data = read_subject_sole_data(3);
 
-% get_stamps(steps, data);
+plot_sole_data(s_data.h.data)
