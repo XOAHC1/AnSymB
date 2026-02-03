@@ -1,5 +1,5 @@
 %% Define base values
-addpath(".\analysis\")
+%addpath(".\analysis\")
 clearvars
 
 % Data structure
@@ -13,13 +13,23 @@ CONDITIONS = ["br", "bvr", "vw", "w", "h", "vh"];
 %% Define Functions
 
 % Read in sole data for one condition by one subject
-function condition_sole_data = read_condition_sole_data(subject, condition)
+function condition_sole_data = read_condition_sole_data(subject, condition, manual_trials)
 
     % Data Format:
     %     1   , 2     , 3     , 4     , 5     , 6     , 7     , 8     , 9     , 10    , 11
         % Time, R-front, R-mid, R-heel, R-total, Time, L-heel, L-mid, L-front, L-total, Time
     % 
     % Data is also accessable by collumn headers. Thoose change depending on the soles used, therefore access via index is to be preferred.
+
+    if nargin < 3
+        manual_trials = false;
+    end
+
+    if manual_trials
+        manual_trial_params = [string(subject), condition];
+    else
+        manual_trial_params = [];
+    end
 
     condition_sole_data = struct();
 
@@ -34,12 +44,14 @@ function condition_sole_data = read_condition_sole_data(subject, condition)
 
     condition_sole_data.data = data;
     condition_sole_data.steps = get_steps(data);
-    condition_sole_data.trials = get_trials(condition_sole_data);
+    condition_sole_data.trials = get_trials(condition_sole_data, manual_trial_params);
+
+
 
 end
 
 % Read in sole data from all trials by one subject
-function subject_sole_data = read_subject_sole_data(subject)
+function subject_sole_data = read_subject_sole_data(subject, manual_trials)
 
     % nice structure:
     %  20       6       10
@@ -47,12 +59,16 @@ function subject_sole_data = read_subject_sole_data(subject)
     %                  .steps
     %                  . 
 
+    if nargin < 2
+        manual_trials = false;
+    end
+
     CONDITIONS = ["br", "bvr", "vw", "w", "h", "vh"];
     subject_sole_data = struct();
 
     for c = 1:numel(CONDITIONS)
         cond = CONDITIONS(c);
-        subject_sole_data.(cond) = read_condition_sole_data(subject, cond);
+        subject_sole_data.(cond) = read_condition_sole_data(subject, cond, manual_trials);
     end
 end
 
@@ -80,13 +96,12 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
     data = condition_data.data;
 
     % ---- Column indices  ----
-    tR = data{:,1};     % Right foot time
+    t = data{:,1};    % universal time
     R_front = data{:,2};
     R_mid   = data{:,3};
     R_heel  = data{:,4};
     R_total = data{:,5};
 
-    tL = data{:,6};     % Left foot time
     L_heel  = data{:,7};
     L_mid   = data{:,8};
     L_front = data{:,9};
@@ -137,8 +152,8 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
     end
 
     % Right foot
-    nexttile
-    plot(tR, [R_heel R_mid R_front R_total], 'LineWidth', 1.2)
+    ax1 = nexttile;
+    plot(t, [R_heel R_mid R_front R_total], 'LineWidth', 1.2)
     hold on
     if mark_steps 
         if ~isempty(walking_r) 
@@ -159,8 +174,8 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
     legend("Heel","Mid","Front","Total","Location","best")
 
     % Left foot
-    nexttile
-    plot(tL, [L_heel L_mid L_front L_total], 'LineWidth', 1.2)
+    ax2 = nexttile;
+    plot(t, [L_heel L_mid L_front L_total], 'LineWidth', 1.2)
     hold on
     if mark_steps 
         if ~isempty(walking_l)
@@ -180,6 +195,7 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
     ylabel("Pressure")
     legend("Heel","Mid","Front","Total","Location","best")
 
+    linkaxes([ax1 ax2], "x")
 end
 
 function steps_side = get_steps_one_side(t, heel, mid, front, total)
@@ -316,7 +332,7 @@ function step_type = step_type(step)
     
 end
 
-function trials = get_trials(condition_data)
+function trials = get_trials(condition_data, manual_trial_params)
 
     % Input: 
     %   trial_data:
@@ -325,32 +341,49 @@ function trials = get_trials(condition_data)
     %           .steps  (metadata around data)
     %       Limited to time from stamp to turning steps
 
+    if nargin < 2 || isempty(manual_trial_params)
+        manual_trials = [];
+        log = "no manual params"
+    end
+
     trials = struct();
 
-    % cd = condition_data.steps
+    if isempty(manual_trial_params)
+        % generate trial sections
 
-    % identify trial borders
-    % stamps to start trials
-    stamps_idx = strcmp([condition_data.steps.right.step_type], "stamp");
-    n_stamps = sum(stamps_idx);
-    stamps = condition_data.steps.right(stamps_idx);
-    trial_starts = arrayfun(@(s) stamps(s).peakTime, 1:n_stamps)*100;
+        % identify trial borders
+        % stamps to start trials
+        stamps_idx = strcmp([condition_data.steps.right.step_type], "stamp");
+        n_trials = sum(stamps_idx);
+        stamps = condition_data.steps.right(stamps_idx);
+        trial_starts = arrayfun(@(s) stamps(s).peakTime, 1:n_trials)*100;
 
-    % turning steps, to end trials
-    turning_steps_idx = strcmp([condition_data.steps.right.step_type], "turning");
-    n_turning = sum(turning_steps_idx);
-    turning_steps = condition_data.steps.right(turning_steps_idx);
-    turning_step_times = arrayfun(@(s) turning_steps(s).peakTime, 1:n_turning)*100;
+        % turning steps, to end trials
+        turning_steps_idx = strcmp([condition_data.steps.right.step_type], "turning");
+        n_turning = sum(turning_steps_idx);
+        turning_steps = condition_data.steps.right(turning_steps_idx);
+        turning_step_times = arrayfun(@(s) turning_steps(s).peakTime, 1:n_turning)*100;
 
-    % match up stamps and turning steps
-    last_trial_end_idx = 1;
-    trial_ends = zeros(n_stamps, 1);
-    for s = 1:n_stamps
-        t = trial_starts(s);
-        while turning_step_times(last_trial_end_idx) < t
-            last_trial_end_idx = last_trial_end_idx + 1;
+        % match up stamps and turning steps
+        last_trial_end_idx = 1;
+        trial_ends = zeros(n_trials, 1);
+        for s = 1:n_trials
+            t = trial_starts(s);
+            while turning_step_times(last_trial_end_idx) < t
+                last_trial_end_idx = last_trial_end_idx + 1;
+            end
+            trial_ends(s) = turning_step_times(last_trial_end_idx);
         end
-        trial_ends(s) = turning_step_times(last_trial_end_idx);
+
+    else
+        % load saved trial params
+        filename = "subject_data\manual_trial_params\" + manual_trial_params(1) + "_" + manual_trial_params(2) + "_trial_times.txt";
+        trial_times = jsondecode(fileread(filename));
+        n_trials = numel(trial_times);
+
+        % extract indices from struct
+        trial_starts = arrayfun(@(s) trial_times(s).start_time, 1:n_trials)*100;
+        trial_ends = arrayfun(@(s) trial_times(s).end_time, 1:n_trials)*100;
     end
 
     % make indices to integers
@@ -358,7 +391,7 @@ function trials = get_trials(condition_data)
     trial_ends = round(trial_ends);
 
     % call analysis for individual trials
-    for i = 1:n_stamps
+    for i = 1:n_trials
         trial_data = condition_data.data(trial_starts(i):trial_ends(i), :);
         trial = analyse_trial(trial_data);
         trials(i).n_stride_r = trial.n_stride_r;
@@ -409,12 +442,69 @@ end
 
     % 
 
+function manual_trial_marking(subject, condition)
+
+    % read in data
+    cond_data = read_condition_sole_data(subject, condition);
+    % plot data for evaluation, mark automated analysis for orientation
+    plot_label = "Subject " + subject + " " + condition;
+    plot_sole_data(cond_data, true, plot_label);
+    trial_times = struct();
+
+    % give mask to enter start and end times
+
+    for idx = 1:20
+        
+        time = input("Enter Start time: ");
+        if isempty(time)
+            break
+        end
+        trial_times(idx).start_time = time;
+
+        time = input("Enter end time: ");
+        trial_times(idx).end_time = time;
+
+        n_trials = idx
+    end
+
+    % save time stamps
+    txt = jsonencode(trial_times);
+    
+    filename = "subject_data\manual_trial_params\" + subject + "_" + condition + "_trial_times.txt";
+    fid = fopen(filename, "w");
+    fprintf(fid, "%s", txt);
+    fclose(fid);
+
+end
+
+function mark_subject_trials(subject, special_conditions)
+
+    if nargin < 2
+        special_conditions = [];
+    end
+
+    classical_conditions = ["br", "bvr", "vw", "w", "h", "vh"];
+
+    conditions = cat(2, classical_conditions, special_conditions);
+
+    for i = 1:numel(conditions)
+        manual_trial_marking(subject, conditions(i))
+    end
+end
+
+
+
 %% Testing
 
-s_data = read_subject_sole_data(3);
-c_data = s_data.h;
+% s_data = read_subject_sole_data(3);
+% c_data = s_data.h;
 
-plot_sole_data(c_data, true);
+% c_data = read_condition_sole_data(3, 'h', true);
+% % plot_sole_data(c_data, true);
 
 
-c_data.trials(1)
+% c_data.trials(1).stride_freq
+
+% manual_trial_marking(3, "h");
+
+mark_subject_trials(4)
