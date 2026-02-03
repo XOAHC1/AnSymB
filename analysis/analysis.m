@@ -1,4 +1,5 @@
 %% Define base values
+addpath(".\analysis\")
 clearvars
 
 % Data structure
@@ -181,16 +182,6 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
 
 end
 
-% get individual trials, mark trial by start time and duration. From stamp to turning steps
-% function trials = identify_trials(condition_sole_data)
-%     % return sturct of individual trials
-%     %  mark trials by starting time and duration
-%     % 
-%     trials = struct();
-
-
-% end
-
 function steps_side = get_steps_one_side(t, heel, mid, front, total)
 
     % find individual steps
@@ -286,24 +277,6 @@ function steps = get_steps(condition_data)
     steps.left = get_steps_one_side(time, heel_l, mid_l, front_l, total_l);
      
 end
-
-% function is_stamp = is_stamp(step)
-
-%     % define thresholds
-%     ROLLING_TH = 0.2 * 1;       % seconds
-%     DURATION_TH = 2 * 1;        % seconds
-%     SLOPE_TH   = 3000 / .7;      % pressure / s
-%     MAX_H_TH   = 0.5  * 100;    % Proportion
-
-%     % decide
-%     is_stamp = ...
-%         step.heelPropAtMax < MAX_H_TH && ...
-%         -0.1 < step.rolling && step.rolling < ROLLING_TH && ...
-%         step.duration < DURATION_TH && ...
-%         step.maxSlope > SLOPE_TH;
-    
-        
-% end
 
 function step_type = step_type(step)
 
@@ -441,7 +414,7 @@ end
 s_data = read_subject_sole_data(3);
 c_data = s_data.h;
 
-% plot_sole_data(c_data, true);
+plot_sole_data(c_data, true);
 
 
 c_data.trials(1)
