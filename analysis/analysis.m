@@ -37,6 +37,21 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
     
     try
         data = readtable(data_path);
+
+        var_names = data.Properties.VariableNames;
+
+        % rename vars
+        heels = contains(var_names, "heel");
+        mids = contains(var_names, "mid");
+        fronts = contains(var_names, "front");
+
+        data = renamevars(data, heels, ["R_heel", "L_heel"]);
+        data = renamevars(data, mids, ["R_mid", "L_mid"]);
+        data = renamevars(data, fronts, ["R_front", "L_front"]);
+
+        data = renamevars(data, [1, 5, 6, 10, 11], ["time_r", "R_total", "time", "L_total", "time_l"]);
+
+
     catch ME 
         % Placeholder for missing data
         data = table(); % empty table
@@ -45,8 +60,6 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
     condition_sole_data.data = data;
     condition_sole_data.steps = get_steps(data);
     condition_sole_data.trials = get_trials(condition_sole_data, manual_trial_params);
-
-
 
 end
 
@@ -96,16 +109,16 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
     data = condition_data.data;
 
     % ---- Column indices  ----
-    t = data{:,1};    % universal time
-    R_front = data{:,2};
-    R_mid   = data{:,3};
-    R_heel  = data{:,4};
-    R_total = data{:,5};
+    t = data.time;    % universal time
+    R_front = data.R_front;
+    R_mid   = data.R_mid;
+    R_heel  = data.R_heel;
+    R_total = data.R_total;
 
-    L_heel  = data{:,7};
-    L_mid   = data{:,8};
-    L_front = data{:,9};
-    L_total = data{:,10};
+    L_heel  = data.L__heel;
+    L_mid   = data.L_mid;
+    L_front = data.L_front;
+    L_total = data.L_total;
 
     % ---- Plot ----
     figure('Name', plotLabel, 'Color', 'w');
@@ -274,17 +287,17 @@ end
 function steps = get_steps(condition_data)
     
     % extract Data
-    time  = condition_data{:, 1};
+    time  = condition_data.time;
     % right side
-    front_r = condition_data{:, 2};
-    mid_r = condition_data{:, 3};
-    heel_r = condition_data{:, 4};
-    total_r = condition_data{:, 5};
+    front_r = condition_data.R_front;
+    mid_r = condition_data.R_mid;
+    heel_r = condition_data.R_heel;
+    total_r = condition_data.R_total;
     % left side
-    front_l = condition_data{:, 9};
-    mid_l = condition_data{:, 8};
-    heel_l = condition_data{:, 7};
-    total_l = condition_data{:, 10}; 
+    front_l = condition_data.L_front;
+    mid_l = condition_data.L_mid;
+    heel_l = condition_data.L_heel;
+    total_l = condition_data.L_total; 
     
     % initialise structure
     steps = struct();
@@ -343,14 +356,14 @@ function trials = get_trials(condition_data, manual_trial_params)
 
     if nargin < 2 || isempty(manual_trial_params)
         manual_trials = [];
-        log = "no manual params"
+        % log = "no manual params"
     end
 
     trials = struct();
 
     if isempty(manual_trial_params)
         % generate trial sections
-
+        % log = "no params"
         % identify trial borders
         % stamps to start trials
         stamps_idx = strcmp([condition_data.steps.right.step_type], "stamp");
@@ -393,6 +406,8 @@ function trials = get_trials(condition_data, manual_trial_params)
     % call analysis for individual trials
     for i = 1:n_trials
         trial_data = condition_data.data(trial_starts(i):trial_ends(i), :);
+        % start_time_log = trial_starts(i)
+        % end_time_log = trial_ends(i)
         trial = analyse_trial(trial_data);
         trials(i).n_stride_r = trial.n_stride_r;
         trials(i).n_stride_l = trial.n_stride_l;
@@ -411,7 +426,7 @@ function trial = analyse_trial(trial_data)
     % trial_data = cond_data_data{start:stop, :};
 
     % get relative time
-    trial_time_abs = trial_data{:, 1};
+    trial_time_abs = trial_data.time;
     trial_start_time = trial_time_abs(1);
     trial_time = trial_time_abs - trial_start_time;
     trial_duration = trial_time(end);
@@ -464,7 +479,7 @@ function manual_trial_marking(subject, condition)
         time = input("Enter end time: ");
         trial_times(idx).end_time = time;
 
-        n_trials = idx
+        n_trials = idx;
     end
 
     % save time stamps
@@ -477,7 +492,7 @@ function manual_trial_marking(subject, condition)
 
 end
 
-function mark_subject_trials(subject, special_conditions)
+function manually_mark_subject_trials(subject, special_conditions)
 
     if nargin < 2
         special_conditions = [];
@@ -496,15 +511,10 @@ end
 
 %% Testing
 
-% s_data = read_subject_sole_data(3);
-% c_data = s_data.h;
+% clearvars
+% s_data = read_subject_sole_data(4, true);
 
-% c_data = read_condition_sole_data(3, 'h', true);
-% % plot_sole_data(c_data, true);
+c_data = s_data.br;
 
-
-% c_data.trials(1).stride_freq
-
-% manual_trial_marking(3, "h");
-
-mark_subject_trials(4)
+i = 1;
+output = c_data.trials(i).duration
