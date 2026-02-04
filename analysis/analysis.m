@@ -115,7 +115,7 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
     R_heel  = data.R_heel;
     R_total = data.R_total;
 
-    L_heel  = data.L__heel;
+    L_heel  = data.L_heel;
     L_mid   = data.L_mid;
     L_front = data.L_front;
     L_total = data.L_total;
@@ -355,7 +355,7 @@ function trials = get_trials(condition_data, manual_trial_params)
     %       Limited to time from stamp to turning steps
 
     if nargin < 2 || isempty(manual_trial_params)
-        manual_trials = [];
+        manual_trial_params = [];
         % log = "no manual params"
     end
 
@@ -468,6 +468,8 @@ function manual_trial_marking(subject, condition)
 
     % give mask to enter start and end times
 
+    Your_task = "Enter the peak times of the stamp and the first breaking step for each trial"
+
     for idx = 1:20
         
         time = input("Enter Start time: ");
@@ -479,7 +481,7 @@ function manual_trial_marking(subject, condition)
         time = input("Enter end time: ");
         trial_times(idx).end_time = time;
 
-        n_trials = idx;
+        n_trials = idx
     end
 
     % save time stamps
@@ -510,11 +512,5 @@ end
 
 
 %% Testing
+clearvars
 
-% clearvars
-% s_data = read_subject_sole_data(4, true);
-
-c_data = s_data.br;
-
-i = 1;
-output = c_data.trials(i).duration
