@@ -33,10 +33,10 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
 
     condition_sole_data = struct();
 
-    data_path = "subject_data\sole-data\" + subject + "\" + condition +".txt";
+    filename = "subject_data\sole-data\" + subject + "\" + condition +".txt";
     
     try
-        data = readtable(data_path);
+        data = readtable(filename);
 
         var_names = data.Properties.VariableNames;
 
@@ -51,6 +51,14 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
 
         data = renamevars(data, [1, 5, 6, 10, 11], ["time_r", "R_total", "time", "L_total", "time_l"]);
 
+        % get time of experiment
+        fid = fopen(filename, "r");
+        str = fgetl(fid);
+        fclose(fid);
+
+        token = regexp(str, '\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}', 'match');
+        dt = datetime(token{1}, 'InputFormat', 'yyyy-MM-dd_HH-mm-ss-SSS');
+
 
     catch ME 
         % Placeholder for missing data
@@ -60,6 +68,7 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
     condition_sole_data.data = data;
     condition_sole_data.steps = get_steps(data);
     condition_sole_data.trials = get_trials(condition_sole_data, manual_trial_params);
+    condition_sole_data.experiment_time = dt;
 
 end
 
@@ -77,12 +86,25 @@ function subject_sole_data = read_subject_sole_data(subject, manual_trials)
     end
 
     CONDITIONS = ["br", "bvr", "vw", "w", "h", "vh"];
+    n_conditions = numel(CONDITIONS);
     subject_sole_data = struct();
 
-    for c = 1:numel(CONDITIONS)
+    experiment_times = NaT(n_conditions);
+
+    for c = 1:n_conditions
         cond = CONDITIONS(c);
         subject_sole_data.(cond) = read_condition_sole_data(subject, cond, manual_trials);
+        experiment_times(c) = subject_sole_data.(cond).experiment_time;
     end
+
+    [~, idx] = sort(experiment_times);
+    sequence = CONDITIONS(idx);
+
+    for s = 1:n_conditions
+        subject_sole_data.(sequence(s)).place_in_sequence = s;
+    end
+
+
 end
 
 % external use
@@ -513,4 +535,3 @@ end
 
 %% Testing
 clearvars
-
