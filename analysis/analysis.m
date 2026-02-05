@@ -63,6 +63,8 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
     condition_sole_data.experiment_time = dt;
     condition_sole_data.mean_step_freq = msf;
 
+    fprintf("Imported " + condition + " data for Subject " + subject + ". \n")
+
 end
 
 % Read in sole data from all trials by one subject. 
@@ -107,17 +109,21 @@ function subject_sole_data = read_subject_sole_data(subject, manual_trials, bonu
 end
 
 % read in sole data for 
-function sole_data = read_sole_data(subjects)
+function sole_data = read_sole_data(subjects, use_manual_trial_borders)
 
-    if nargin < 1
+    if nargin < 1 || isempty(subjects)
         subjects = 4:7;
+    end
+
+    if nargin < 2 || isempty(use_manual_trial_borders)
+        use_manual_trial_borders = true;
     end
 
     sole_data = struct();
 
     for i = 1:numel(subjects)
         s = subjects(i);
-        sole_data.("s"+s) = read_subject_sole_data(s, true);
+        sole_data.("s"+s) = read_subject_sole_data(s, use_manual_trial_borders);
     end
 end
 
@@ -283,6 +289,7 @@ function [trials, mean_step_freq] = get_trials(condition_data, manual_trial_para
 
         % turning steps, to end trials
         turning_steps_idx = strcmp([condition_data.steps.right.step_type], "turning");
+
         % n_turning = sum(turning_steps_idx);
         turning_steps = condition_data.steps.right(turning_steps_idx);
         turning_step_times = [turning_steps.peakTime] * 100;
@@ -290,13 +297,26 @@ function [trials, mean_step_freq] = get_trials(condition_data, manual_trial_para
         % match up stamps and turning steps
         last_trial_end_idx = 1;
         trial_ends = zeros(n_trials, 1);
+
+        exitt = false; % to leave, if no turning steps remain
         for s = 1:n_trials
             t = trial_starts(s);
             while turning_step_times(last_trial_end_idx) < t
                 last_trial_end_idx = last_trial_end_idx + 1;
+                if last_trial_end_idx == numel(turning_step_times) % no turning steps after stamp
+                    exitt = true;
+                    break
+                end
             end
-            trial_ends(s) = turning_step_times(last_trial_end_idx);
+            if exitt
+                trial_starts = trial_starts(1:s-1);
+                trial_ends = trial_ends(1:s-1);
+                break 
+            else
+                trial_ends(s) = turning_step_times(last_trial_end_idx);
+            end
         end
+        n_trials = numel(trial_starts);
 
     % get manually marked trial sections
     else
@@ -553,19 +573,5 @@ end
 %% Testing
 % clearvars
 
-% d = read_sole_data(3:21);
+d = read_sole_data(4:7);
 
-% CONDITIONS = ["br", "bvr", "vw", "w", "h", "vh"];
-% s = "s7"
-% for i = 1:numel(CONDITIONS)
-%     cond = CONDITIONS(i);
-%     step_freqs(i) = d.(s).(cond).mean_step_freq;
-%     seq_p(i) = d.(s).(cond).place_in_sequence;
-% end
-
-% step_freqs
-% seq_p
-
-
-c_data = read_condition_sole_data(9, "vw")
-plot_sole_data(c_data, true)
