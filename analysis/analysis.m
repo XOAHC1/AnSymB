@@ -1,6 +1,8 @@
 %% Define Functions
 clearvars
 
+%% Read in Data
+
 % Read in sole data for one condition by one subject
 function condition_sole_data = read_condition_sole_data(subject, condition, manual_trials)
 
@@ -62,7 +64,7 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
 
 end
 
-% Read in sole data from all trials by one subject
+% Read in sole data from all trials by one subject. 
 function subject_sole_data = read_subject_sole_data(subject, manual_trials, bonus_conditions)
 
     % nice structure:
@@ -103,6 +105,7 @@ function subject_sole_data = read_subject_sole_data(subject, manual_trials, bonu
 
 end
 
+% read in sole data for 
 function sole_data = read_sole_data(subjects)
 
     if nargin < 1
@@ -117,135 +120,30 @@ function sole_data = read_sole_data(subjects)
     end
 end
 
+%% prepare Data for analysis
 
-% external use
-function plot_sole_data(condition_data, mark_steps, plotLabel)
+% analyse step parameters in data
+function steps = get_steps(condition_data)
+    
+    % extract Data
+    time  = condition_data.time;
+    % right side
+    front_r = condition_data.R_front;
+    mid_r = condition_data.R_mid;
+    heel_r = condition_data.R_heel;
+    total_r = condition_data.R_total;
+    % left side
+    front_l = condition_data.L_front;
+    mid_l = condition_data.L_mid;
+    heel_l = condition_data.L_heel;
+    total_l = condition_data.L_total; 
+    
+    % initialise structure
+    steps = struct();
 
-    % input: 
-    %   condition_data: struct with fields :
-    %       .data: table of forcesole data
-    %       .steps: struct with step parameters. Only needed if mark_steps == true
-    %   mark_steps:
-    %       boolean, optional. If true, .steps is needed
-    %   plot_label:
-    %       string, optional
-
-    % ---- Input checks ----
-    if nargin < 1 || isempty(condition_data)
-        error("Input data must be a non-empty struct with the fields .data and .steps.");
-    end
-
-    if nargin < 2 || isempty(mark_steps)
-        mark_steps = false;
-    end
-
-    if nargin < 3 || isempty(plotLabel)
-        plotLabel = "some Data";
-    end
-
-    % get sole data
-    data = condition_data.data;
-
-    % ---- Column indices  ----
-    t = data.time;
-    R_front = data.R_front;
-    R_mid   = data.R_mid;
-    R_heel  = data.R_heel;
-    R_total = data.R_total;
-
-    L_heel  = data.L_heel;
-    L_mid   = data.L_mid;
-    L_front = data.L_front;
-    L_total = data.L_total;
-
-    % ---- Plot ----
-    figure('Name', plotLabel, 'Color', 'w');
-
-    tiledlayout(2,1,"TileSpacing","compact")
-
-    if mark_steps
-        % get steps
-        steps = condition_data.steps;
-
-        % get step peak times
-        steps_r = steps.right;
-        % n_steps_r = numel(steps_r);
-        step_times_r = [steps_r.peakTime];    
-        step_types_r = [steps_r.step_type];            
-
-        % group steps by types
-        stamp_indices_r   = step_types_r == "stamp";
-        stamps_r          = step_times_r(stamp_indices_r);
-
-        walking_indices_r = step_types_r == "walking";
-        walking_r         = step_times_r(walking_indices_r);
-
-        turning_indices_r = step_types_r == "turning";
-        turning_r         = step_times_r(turning_indices_r);
-
-        % and for the left
-        steps_l = steps.left;
-        % n_steps_l = numel(steps_l);
-        step_times_l = [steps_l.peakTime];
-        step_types_l = [steps_l.step_type];
-
-        % group steps by types
-        stamp_indices_l   = step_types_l == "stamp";
-        stamps_l          = step_times_l(stamp_indices_l);
-
-        walking_indices_l = step_types_l == "walking";
-        walking_l         = step_times_l(walking_indices_l);
-
-        turning_indices_l = step_types_l == "turning";
-        turning_l         = step_times_l(turning_indices_l);
-
-    end
-
-    % Right foot
-    ax1 = nexttile;
-    plot(t, [R_heel R_mid R_front R_total], 'LineWidth', 1.2)
-    hold on
-    if mark_steps 
-        if ~isempty(walking_r) 
-            plot(walking_r, 500, "Color", "red", "Marker", "+");
-        end
-        if ~isempty(stamps_r) 
-            plot(stamps_r, 550, "Color", "magenta", "Marker", "diamond");
-        end
-        if ~isempty(turning_r) 
-            plot(turning_r, 450, "Color", "green", "Marker", "*");
-        end
-    end
-    hold off
-    grid on
-    title("Right Foot")
-    xlabel("Time")
-    ylabel("Pressure")
-    legend("Heel","Mid","Front","Total","Location","best")
-
-    % Left foot
-    ax2 = nexttile;
-    plot(t, [L_heel L_mid L_front L_total], 'LineWidth', 1.2)
-    hold on
-    if mark_steps 
-        if ~isempty(walking_l)
-            plot(walking_l, 500, "Color", "red", "Marker", "+");
-        end
-        if ~isempty(stamps_l)
-            plot(stamps_l, 550, "Color", "magenta", "Marker", "diamond");
-        end
-        if ~isempty(turning_l)
-            plot(turning_l, 450, "Color", "green", "Marker", "*");
-        end
-    end
-    hold off
-    grid on
-    title("Left Foot")
-    xlabel("Time")
-    ylabel("Pressure")
-    legend("Heel","Mid","Front","Total","Location","best")
-
-    linkaxes([ax1 ax2], "x")
+    steps.right = get_steps_one_side(time, heel_r, mid_r, front_r, total_r);
+    steps.left = get_steps_one_side(time, heel_l, mid_l, front_l, total_l);
+     
 end
 
 function steps_side = get_steps_one_side(t, heel, mid, front, total)
@@ -321,29 +219,6 @@ function steps_side = get_steps_one_side(t, heel, mid, front, total)
 
 end
 
-function steps = get_steps(condition_data)
-    
-    % extract Data
-    time  = condition_data.time;
-    % right side
-    front_r = condition_data.R_front;
-    mid_r = condition_data.R_mid;
-    heel_r = condition_data.R_heel;
-    total_r = condition_data.R_total;
-    % left side
-    front_l = condition_data.L_front;
-    mid_l = condition_data.L_mid;
-    heel_l = condition_data.L_heel;
-    total_l = condition_data.L_total; 
-    
-    % initialise structure
-    steps = struct();
-
-    steps.right = get_steps_one_side(time, heel_r, mid_r, front_r, total_r);
-    steps.left = get_steps_one_side(time, heel_l, mid_l, front_l, total_l);
-     
-end
-
 function step_type = step_type(step)
 
     % stamp thresholds
@@ -382,6 +257,7 @@ function step_type = step_type(step)
     
 end
 
+% analyse trials in the data
 function trials = get_trials(condition_data, manual_trial_params)
 
     % Input: 
@@ -517,10 +393,7 @@ function trial = analyse_trial(trial_data)
 
 end
 
-% rechter Peak bis rechter peak -> stride
-
-    % 
-
+% extract trials from Data
 function manual_trial_marking(subject, condition)
 
     % read in data
@@ -573,7 +446,139 @@ function manually_mark_subject_trials(subject, special_conditions)
     end
 end
 
+%% Visualise data 
 
+function plot_sole_data(condition_data, mark_steps, plotLabel)
+
+    % input: 
+    %   condition_data: struct with fields :
+    %       .data: table of forcesole data
+    %       .steps: struct with step parameters. Only needed if mark_steps == true
+    %   mark_steps:
+    %       boolean, optional. If true, .steps is needed
+    %   plot_label:
+    %       string, optional
+
+    % ---- Input checks ----
+    if nargin < 1 || isempty(condition_data)
+        error("Input data must be a non-empty struct with the fields .data and .steps.");
+    end
+
+    if nargin < 2 || isempty(mark_steps)
+        mark_steps = false;
+    end
+
+    if nargin < 3 || isempty(plotLabel)
+        plotLabel = "some Data";
+    end
+
+    % get sole data
+    data = condition_data.data;
+
+    % ---- Column indices  ----
+    t = data.time;
+    R_front = data.R_front;
+    R_mid   = data.R_mid;
+    R_heel  = data.R_heel;
+    R_total = data.R_total;
+
+    L_heel  = data.L_heel;
+    L_mid   = data.L_mid;
+    L_front = data.L_front;
+    L_total = data.L_total;
+
+    % ---- Plot ----
+    figure('Name', plotLabel, 'Color', 'w');
+
+    tiledlayout(2,1,"TileSpacing","compact")
+
+    if mark_steps
+        % get steps
+        steps = condition_data.steps;
+
+        % get step peak times
+        steps_r = steps.right;
+        % n_steps_r = numel(steps_r);
+        step_times_r = [steps_r.peakTime];    
+        step_types_r = [steps_r.step_type];            
+
+        % group steps by types
+        stamp_indices_r   = step_types_r == "stamp";
+        stamps_r          = step_times_r(stamp_indices_r);
+
+        walking_indices_r = step_types_r == "walking";
+        walking_r         = step_times_r(walking_indices_r);
+
+        turning_indices_r = step_types_r == "turning";
+        turning_r         = step_times_r(turning_indices_r);
+
+        % and for the left
+        steps_l = steps.left;
+        % n_steps_l = numel(steps_l);
+        step_times_l = [steps_l.peakTime];
+        step_types_l = [steps_l.step_type];
+
+        % group steps by types
+        stamp_indices_l   = step_types_l == "stamp";
+        stamps_l          = step_times_l(stamp_indices_l);
+
+        walking_indices_l = step_types_l == "walking";
+        walking_l         = step_times_l(walking_indices_l);
+
+        turning_indices_l = step_types_l == "turning";
+        turning_l         = step_times_l(turning_indices_l);
+
+    end
+
+    % Right foot
+    ax1 = nexttile;
+    plot(t, [R_heel R_mid R_front R_total], 'LineWidth', 1.2)
+    hold on
+    if mark_steps 
+        if ~isempty(walking_r) 
+            plot(walking_r, 500, "Color", "red", "Marker", "+");
+        end
+        if ~isempty(stamps_r) 
+            plot(stamps_r, 550, "Color", "magenta", "Marker", "diamond");
+        end
+        if ~isempty(turning_r) 
+            plot(turning_r, 450, "Color", "green", "Marker", "*");
+        end
+    end
+    hold off
+    grid on
+    title("Right Foot")
+    xlabel("Time")
+    ylabel("Pressure")
+    legend("Heel","Mid","Front","Total","Location","best")
+
+    % Left foot
+    ax2 = nexttile;
+    plot(t, [L_heel L_mid L_front L_total], 'LineWidth', 1.2)
+    hold on
+    if mark_steps 
+        if ~isempty(walking_l)
+            plot(walking_l, 500, "Color", "red", "Marker", "+");
+        end
+        if ~isempty(stamps_l)
+            plot(stamps_l, 550, "Color", "magenta", "Marker", "diamond");
+        end
+        if ~isempty(turning_l)
+            plot(turning_l, 450, "Color", "green", "Marker", "*");
+        end
+    end
+    hold off
+    grid on
+    title("Left Foot")
+    xlabel("Time")
+    ylabel("Pressure")
+    legend("Heel","Mid","Front","Total","Location","best")
+
+    linkaxes([ax1 ax2], "x")
+end
+
+%% Analyse data
+% The functions in this section should be called individually, getting prepared data as input.
 
 %% Testing
 clearvars
