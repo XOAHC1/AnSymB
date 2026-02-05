@@ -25,7 +25,7 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
     filename = "subject_data\sole-data\" + subject + "\" + condition +".txt";
     
     try
-        data = readtable(filename);
+        data = readtable(filename, "VariableNamingRule", "preserve");
 
         var_names = data.Properties.VariableNames;
 
@@ -98,8 +98,25 @@ function subject_sole_data = read_subject_sole_data(subject, manual_trials, bonu
         subject_sole_data.(sequence(s)).place_in_sequence = s;
     end
 
+    % log
+    fprintf("Imported Data of Subject " + subject + "\n");
 
 end
+
+function sole_data = read_sole_data(subjects)
+
+    if nargin < 1
+        subjects = 4:7;
+    end
+
+    sole_data = struct();
+
+    for i = 1:numel(subjects)
+        s = subjects(i);
+        sole_data.("s"+s) = read_subject_sole_data(s, true);
+    end
+end
+
 
 % external use
 function plot_sole_data(condition_data, mark_steps, plotLabel)
