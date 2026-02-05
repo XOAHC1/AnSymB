@@ -1,16 +1,5 @@
-%% Define base values
-%addpath(".\analysis\")
-clearvars
-
-% Data structure
-SOLE_DATA_PATH = "subject_data\sole-data";
-VR_DATA_PATH = "subject_data\vr_data";
-
-% Experiment related
-N_SUBJECTS = 21;
-CONDITIONS = ["br", "bvr", "vw", "w", "h", "vh"];
-
 %% Define Functions
+clearvars
 
 % Read in sole data for one condition by one subject
 function condition_sole_data = read_condition_sole_data(subject, condition, manual_trials)
@@ -62,7 +51,7 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
 
     catch ME 
         % Placeholder for missing data
-        log = 'no Data for condition: ' + condition
+        fprintf('no Data for condition: ' + condition);
         return
     end 
 
@@ -90,8 +79,6 @@ function subject_sole_data = read_subject_sole_data(subject, manual_trials, bonu
         bonus_conditions = [];
     end
 
-
-
     CONDITIONS = cat(2, ["br", "bvr", "vw", "w", "h", "vh"], bonus_conditions);
     n_conditions = numel(CONDITIONS);
     subject_sole_data = struct();
@@ -116,14 +103,19 @@ end
 
 % external use
 function plot_sole_data(condition_data, mark_steps, plotLabel)
-    %PLOT_SOLE_DATA Plot sole pressure data from a table
-    %
-    %   plot_sole_data(data)
-    %   plot_sole_data(data, "S01 - br")
+
+    % input: 
+    %   condition_data: struct with fields :
+    %       .data: table of forcesole data
+    %       .steps: struct with step parameters. Only needed if mark_steps == true
+    %   mark_steps:
+    %       boolean, optional. If true, .steps is needed
+    %   plot_label:
+    %       string, optional
 
     % ---- Input checks ----
     if nargin < 1 || isempty(condition_data)
-        error("Input data must be a non-empty table.");
+        error("Input data must be a non-empty struct with the fields .data and .steps.");
     end
 
     if nargin < 2 || isempty(mark_steps)
@@ -138,7 +130,7 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
     data = condition_data.data;
 
     % ---- Column indices  ----
-    t = data.time;    % universal time
+    t = data.time;
     R_front = data.R_front;
     R_mid   = data.R_mid;
     R_heel  = data.R_heel;
@@ -160,10 +152,11 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
 
         % get step peak times
         steps_r = steps.right;
-        n_steps_r = numel(steps_r);
-        step_times_r = arrayfun(@(i) steps_r(i).peakTime, 1:n_steps_r);
-        step_types_r = arrayfun(@(i) steps_r(i).step_type, 1:n_steps_r);
-        
+        % n_steps_r = numel(steps_r);
+        step_times_r = [steps_r.peakTime];    
+        step_types_r = [steps_r.step_type];            
+
+        % group steps by types
         stamp_indices_r   = step_types_r == "stamp";
         stamps_r          = step_times_r(stamp_indices_r);
 
@@ -173,14 +166,13 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
         turning_indices_r = step_types_r == "turning";
         turning_r         = step_times_r(turning_indices_r);
 
-
-
         % and for the left
         steps_l = steps.left;
-        n_steps_l = numel(steps_l);
-        step_times_l = arrayfun(@(i) steps_l(i).peakTime, 1:n_steps_l);
-        step_types_l = arrayfun(@(i) steps_l(i).step_type, 1:n_steps_l);
+        % n_steps_l = numel(steps_l);
+        step_times_l = [steps_l.peakTime];
+        step_types_l = [steps_l.step_type];
 
+        % group steps by types
         stamp_indices_l   = step_types_l == "stamp";
         stamps_l          = step_times_l(stamp_indices_l);
 
@@ -189,7 +181,6 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
 
         turning_indices_l = step_types_l == "turning";
         turning_l         = step_times_l(turning_indices_l);
-
 
     end
 
@@ -276,7 +267,7 @@ function steps_side = get_steps_one_side(t, heel, mid, front, total)
 
         % Peak times
         [max_h ,mih] = max(h);
-        [max_m ,mim] = max(m);
+        % [max_m ,mim] = max(m);
         [max_f ,mif] = max(f);
         [peakForce, peakIndex] = max(tot);
 
@@ -398,13 +389,13 @@ function trials = get_trials(condition_data, manual_trial_params)
         stamps_idx = strcmp([condition_data.steps.right.step_type], "stamp");
         n_trials = sum(stamps_idx);
         stamps = condition_data.steps.right(stamps_idx);
-        trial_starts = arrayfun(@(s) stamps(s).peakTime, 1:n_trials)*100;
+        trial_starts = [stamps.peakTime] * 100;
 
         % turning steps, to end trials
         turning_steps_idx = strcmp([condition_data.steps.right.step_type], "turning");
-        n_turning = sum(turning_steps_idx);
+        % n_turning = sum(turning_steps_idx);
         turning_steps = condition_data.steps.right(turning_steps_idx);
-        turning_step_times = arrayfun(@(s) turning_steps(s).peakTime, 1:n_turning)*100;
+        turning_step_times = [turning_steps.peakTime] * 100;
 
         % match up stamps and turning steps
         last_trial_end_idx = 1;
@@ -424,8 +415,8 @@ function trials = get_trials(condition_data, manual_trial_params)
         n_trials = numel(trial_times);
 
         % extract indices from struct
-        trial_starts = arrayfun(@(s) trial_times(s).start_time, 1:n_trials)*100;
-        trial_ends = arrayfun(@(s) trial_times(s).end_time, 1:n_trials)*100;
+        trial_starts = [trial_times.start_time] * 100;
+        trial_ends = [trial_times.end_time] * 100;
     end
 
     % make indices to integers
@@ -435,9 +426,9 @@ function trials = get_trials(condition_data, manual_trial_params)
     % call analysis for individual trials
     for i = 1:n_trials
         trial_data = condition_data.data(trial_starts(i):trial_ends(i), :);
-        % start_time_log = trial_starts(i)
-        % end_time_log = trial_ends(i)
         trial = analyse_trial(trial_data);
+
+        % write data in new trial
         trials(i).n_stride_r = trial.n_stride_r;
         trials(i).n_stride_l = trial.n_stride_l;
         trials(i).stride_freq_r = trial.stride_freq_r;
@@ -445,11 +436,15 @@ function trials = get_trials(condition_data, manual_trial_params)
         trials(i).stride_freq = trial.stride_freq;
         trials(i).duration = trial.duration;
         trials(i).start = trial.start;
+        trials(i).step_period = trial.step_period;
+        trials(i).step_freq = trial.step_freq;
+
     end
 
 end
 
 function trial = analyse_trial(trial_data)
+    % input: only table of sole data
 
     trial = struct();
     % trial_data = cond_data_data{start:stop, :};
@@ -462,16 +457,36 @@ function trial = analyse_trial(trial_data)
 
     trial_steps = get_steps(trial_data);
 
+    % TODO:
+    % exclude steps ongoing at start (stamp, standing on the other foot)
+    % exclude first step, if diff(1., 2. step) too big
+    % exclude steps ongoing at trial end
+
     % stride frequency
     n_stride_r = numel(trial_steps.right);
     n_stride_l = numel(trial_steps.left);
+    n_steps = n_stride_r + n_stride_l;
 
     stride_freq_r = 60 / mean(diff([trial_steps.right.peakTime]));
     stride_freq_l = 60 / mean(diff([trial_steps.left.peakTime]));
     stride_freq_mean = mean([stride_freq_r * n_stride_r, stride_freq_l * n_stride_l])/ (n_stride_r + n_stride_l);
 
+    % step frequencies
+    % combine steps in one array
+    all_steps_time = zeros(1, n_steps);
+    for sr = 1:n_stride_r
+        all_steps_time(sr) = trial_steps.right(sr).peakTime;
+    end
+    for sl = 1:n_stride_l
+        all_steps_time(n_stride_r + sl) = trial_steps.left(sl).peakTime;
+    end
+    all_steps_time = sort(all_steps_time, 2);
 
+    % calculate freq
+    step_period = mean(diff(all_steps_time));   % Seconds per step
+    step_freq = 60 / step_period;               % steps per minute
 
+    % write attributes in return structure
     trial(1).n_stride_r = n_stride_r;
     trial.n_stride_l = n_stride_l;
     trial.stride_freq_r = stride_freq_r;
@@ -479,6 +494,8 @@ function trial = analyse_trial(trial_data)
     trial.stride_freq = stride_freq_mean;
     trial.duration = trial_duration;
     trial.start = trial_start_time;
+    trial.step_period = step_period;
+    trial.step_freq = step_freq;
 
 
 end
@@ -498,7 +515,7 @@ function manual_trial_marking(subject, condition)
 
     % give mask to enter start and end times
 
-    Your_task = "Enter the peak times of the stamp and the first breaking step for each trial"
+    fprintf("Enter the peak times of the stamp and the first breaking step for each trial \n")
 
     for idx = 1:20
         
@@ -511,7 +528,7 @@ function manual_trial_marking(subject, condition)
         time = input("Enter end time: ");
         trial_times(idx).end_time = time;
 
-        n_trials = idx
+        fprintf("trials marked: " + idx + "\n")
     end
 
     % save time stamps
@@ -544,5 +561,3 @@ end
 %% Testing
 clearvars
 
-
-sd = read_subject_sole_data(7, true, "vhc")
