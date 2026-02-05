@@ -59,8 +59,9 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
 
     condition_sole_data.data = data;
     condition_sole_data.steps = get_steps(data);
-    condition_sole_data.trials = get_trials(condition_sole_data, manual_trial_params);
+    [condition_sole_data.trials, msf] = get_trials(condition_sole_data, manual_trial_params);
     condition_sole_data.experiment_time = dt;
+    condition_sole_data.mean_step_freq = msf;
 
 end
 
@@ -232,7 +233,7 @@ function step_type = step_type(step)
     DURATION_WALK_TH = 1;
     SLOPE_WALK_TH = [0, 10000];
 
-
+    % classify steps events according to thresholds
     if ...
         step.heelPropAtMax < MAX_H_TH && ...
         -0.1 < step.rolling && step.rolling < ROLLING_TH && ...
@@ -252,13 +253,11 @@ function step_type = step_type(step)
     else 
         step_type = "turning";
     end
-
-    
-    
+  
 end
 
 % analyse trials in the data
-function trials = get_trials(condition_data, manual_trial_params)
+function [trials, mean_step_freq] = get_trials(condition_data, manual_trial_params)
 
     % Input: 
     %   trial_data:
@@ -272,12 +271,10 @@ function trials = get_trials(condition_data, manual_trial_params)
         % log = "no manual params"
     end
 
-    trials = struct();
-
+    % Get trial sections
+    % generate trial sections
     if isempty(manual_trial_params)
-        % generate trial sections
-        % log = "no params"
-        % identify trial borders
+
         % stamps to start trials
         stamps_idx = strcmp([condition_data.steps.right.step_type], "stamp");
         n_trials = sum(stamps_idx);
@@ -301,7 +298,9 @@ function trials = get_trials(condition_data, manual_trial_params)
             trial_ends(s) = turning_step_times(last_trial_end_idx);
         end
 
+    % get manually marked trial sections
     else
+
         % load saved trial params
         filename = "subject_data\manual_trial_params\" + manual_trial_params(1) + "_" + manual_trial_params(2) + "_trial_times.txt";
         trial_times = jsondecode(fileread(filename));
@@ -316,23 +315,16 @@ function trials = get_trials(condition_data, manual_trial_params)
     trial_starts = round(trial_starts);
     trial_ends = round(trial_ends);
 
-    % call analysis for individual trials
+    % initialise return structure
+    trials = struct('n_stride_r', {}, 'n_stride_l', {}, 'stride_freq_r', {}, 'stride_freq_l', {}, 'stride_freq', {}, 'duration', {}, 'start', {}, 'step_period', {}, 'step_freq', {});
+    
     for i = 1:n_trials
         trial_data = condition_data.data(trial_starts(i):trial_ends(i), :);
         trial = analyse_trial(trial_data);
-
-        % write data in new trial
-        trials(i).n_stride_r = trial.n_stride_r;
-        trials(i).n_stride_l = trial.n_stride_l;
-        trials(i).stride_freq_r = trial.stride_freq_r;
-        trials(i).stride_freq_l = trial.stride_freq_l;
-        trials(i).stride_freq = trial.stride_freq;
-        trials(i).duration = trial.duration;
-        trials(i).start = trial.start;
-        trials(i).step_period = trial.step_period;
-        trials(i).step_freq = trial.step_freq;
-
+        trials(i) = trial; % Ensure the structure matches
     end
+
+    mean_step_freq = mean([trials.step_freq]);
 
 end
 
@@ -496,38 +488,9 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
         % get steps
         steps = condition_data.steps;
 
-        % get step peak times
-        steps_r = steps.right;
-        % n_steps_r = numel(steps_r);
-        step_times_r = [steps_r.peakTime];    
-        step_types_r = [steps_r.step_type];            
-
-        % group steps by types
-        stamp_indices_r   = step_types_r == "stamp";
-        stamps_r          = step_times_r(stamp_indices_r);
-
-        walking_indices_r = step_types_r == "walking";
-        walking_r         = step_times_r(walking_indices_r);
-
-        turning_indices_r = step_types_r == "turning";
-        turning_r         = step_times_r(turning_indices_r);
-
-        % and for the left
-        steps_l = steps.left;
-        % n_steps_l = numel(steps_l);
-        step_times_l = [steps_l.peakTime];
-        step_types_l = [steps_l.step_type];
-
-        % group steps by types
-        stamp_indices_l   = step_types_l == "stamp";
-        stamps_l          = step_times_l(stamp_indices_l);
-
-        walking_indices_l = step_types_l == "walking";
-        walking_l         = step_times_l(walking_indices_l);
-
-        turning_indices_l = step_types_l == "turning";
-        turning_l         = step_times_l(turning_indices_l);
-
+        % get step peak times and group by types
+        [stamps_r, walking_r, turning_r] = group_steps_by_type(steps.right);
+        [stamps_l, walking_l, turning_l] = group_steps_by_type(steps.left);
     end
 
     % Right foot
@@ -535,15 +498,9 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
     plot(t, [R_heel R_mid R_front R_total], 'LineWidth', 1.2)
     hold on
     if mark_steps 
-        if ~isempty(walking_r) 
-            plot(walking_r, 500, "Color", "red", "Marker", "+");
-        end
-        if ~isempty(stamps_r) 
-            plot(stamps_r, 550, "Color", "magenta", "Marker", "diamond");
-        end
-        if ~isempty(turning_r) 
-            plot(turning_r, 450, "Color", "green", "Marker", "*");
-        end
+        plot_step_markers(walking_r, 500, "red", "+");
+        plot_step_markers(stamps_r, 550, "magenta", "diamond");
+        plot_step_markers(turning_r, 450, "green", "*");
     end
     hold off
     grid on
@@ -557,15 +514,9 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
     plot(t, [L_heel L_mid L_front L_total], 'LineWidth', 1.2)
     hold on
     if mark_steps 
-        if ~isempty(walking_l)
-            plot(walking_l, 500, "Color", "red", "Marker", "+");
-        end
-        if ~isempty(stamps_l)
-            plot(stamps_l, 550, "Color", "magenta", "Marker", "diamond");
-        end
-        if ~isempty(turning_l)
-            plot(turning_l, 450, "Color", "green", "Marker", "*");
-        end
+        plot_step_markers(walking_l, 500, "red", "+");
+        plot_step_markers(stamps_l, 550, "magenta", "diamond");
+        plot_step_markers(turning_l, 450, "green", "*");
     end
     hold off
     grid on
@@ -577,9 +528,44 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
     linkaxes([ax1 ax2], "x")
 end
 
+function [stamps, walking, turning] = group_steps_by_type(steps_side)
+    % Group steps by type (stamp, walking, turning)
+    step_times = [steps_side.peakTime];
+    step_types = [steps_side.step_type];
+    
+    stamps = step_times(step_types == "stamp");
+    walking = step_times(step_types == "walking");
+    turning = step_times(step_types == "turning");
+end
+
+function plot_step_markers(step_times, y_pos, color, marker)
+    % Plot markers for steps if they exist
+    if ~isempty(step_times)
+        plot(step_times, y_pos, "Color", color, "Marker", marker);
+    end
+end
+
 %% Analyse data
 % The functions in this section should be called individually, getting prepared data as input.
 
-%% Testing
-clearvars
 
+
+%% Testing
+% clearvars
+
+% d = read_sole_data(3:21);
+
+% CONDITIONS = ["br", "bvr", "vw", "w", "h", "vh"];
+% s = "s7"
+% for i = 1:numel(CONDITIONS)
+%     cond = CONDITIONS(i);
+%     step_freqs(i) = d.(s).(cond).mean_step_freq;
+%     seq_p(i) = d.(s).(cond).place_in_sequence;
+% end
+
+% step_freqs
+% seq_p
+
+
+c_data = read_condition_sole_data(9, "vw")
+plot_sole_data(c_data, true)
