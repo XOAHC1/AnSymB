@@ -62,7 +62,8 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
 
     catch ME 
         % Placeholder for missing data
-        data = table(); % empty table
+        log = 'no Data for condition: ' + condition
+        return
     end 
 
     condition_sole_data.data = data;
@@ -73,7 +74,7 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
 end
 
 % Read in sole data from all trials by one subject
-function subject_sole_data = read_subject_sole_data(subject, manual_trials)
+function subject_sole_data = read_subject_sole_data(subject, manual_trials, bonus_conditions)
 
     % nice structure:
     %  20       6       10
@@ -81,11 +82,17 @@ function subject_sole_data = read_subject_sole_data(subject, manual_trials)
     %                  .steps
     %                  . 
 
-    if nargin < 2
+    if nargin < 2 || isempty(manual_trials)
         manual_trials = false;
     end
 
-    CONDITIONS = ["br", "bvr", "vw", "w", "h", "vh"];
+    if nargin < 3 || isempty(bonus_conditions)
+        bonus_conditions = [];
+    end
+
+
+
+    CONDITIONS = cat(2, ["br", "bvr", "vw", "w", "h", "vh"], bonus_conditions);
     n_conditions = numel(CONDITIONS);
     subject_sole_data = struct();
 
@@ -475,6 +482,7 @@ function trial = analyse_trial(trial_data)
 
 
 end
+
 % rechter Peak bis rechter peak -> stride
 
     % 
@@ -535,3 +543,6 @@ end
 
 %% Testing
 clearvars
+
+
+sd = read_subject_sole_data(7, true, "vhc")
