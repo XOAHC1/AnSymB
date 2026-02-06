@@ -59,9 +59,10 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
 
     condition_sole_data.data = data;
     condition_sole_data.steps = get_steps(data);
-    [condition_sole_data.trials, msf] = get_trials(condition_sole_data, manual_trial_params);
+    [condition_sole_data.trials, msf, std_freq] = get_trials(condition_sole_data, manual_trial_params);
     condition_sole_data.experiment_time = dt;
     condition_sole_data.mean_step_freq = msf;
+    condition_sole_data.std_step_freq = std_freq;
 
     fprintf("Imported " + condition + " data for Subject " + subject + ". \n")
 
@@ -201,6 +202,10 @@ function steps_side = get_steps_one_side(t, heel, mid, front, total)
         dt = mean(diff(t_evt));
         steps_side(i).maxSlope = max(diff(tot)) / dt;
 
+        % start and end of contact
+        steps_side(i).start_time = t_evt(1);
+        steps_side(i).end_time = t_evt(end);
+
         % Contact duration
         steps_side(i).duration = t_evt(end) - t_evt(1);
 
@@ -263,7 +268,7 @@ function step_type = step_type(step)
 end
 
 % analyse trials in the data
-function [trials, mean_step_freq] = get_trials(condition_data, manual_trial_params)
+function [trials, mean_step_freq, freq_std] = get_trials(condition_data, manual_trial_params)
 
     % Input: 
     %   trial_data:
@@ -336,7 +341,15 @@ function [trials, mean_step_freq] = get_trials(condition_data, manual_trial_para
     trial_ends = round(trial_ends);
 
     % initialise return structure
-    trials = struct('n_stride_r', {}, 'n_stride_l', {}, 'stride_freq_r', {}, 'stride_freq_l', {}, 'stride_freq', {}, 'duration', {}, 'start', {}, 'step_period', {}, 'step_freq', {});
+    trials = struct(...
+        'start',            {}, ...
+        'duration',         {}, ...
+        'n_steps',          {}, ...
+        'step_period',      {}, ...
+        'step_period_std',  {}, ...
+        'step_freq',        {}, ...
+        'stride_freq',      {} ...
+        );
     
     for i = 1:n_trials
         trial_data = condition_data.data(trial_starts(i):trial_ends(i), :);
@@ -345,27 +358,49 @@ function [trials, mean_step_freq] = get_trials(condition_data, manual_trial_para
     end
 
     mean_step_freq = mean([trials.step_freq]);
+    freq_std = std([trials.step_freq]);
 
 end
 
 function trial = analyse_trial(trial_data)
     % input: only table of sole data
 
+    % initialise return struct
     trial = struct();
-    % trial_data = cond_data_data{start:stop, :};
 
     % get relative time
     trial_time_abs = trial_data.time;
     trial_start_time = trial_time_abs(1);
+    trial_end_time = trial_time_abs(end);
     trial_time = trial_time_abs - trial_start_time;
     trial_duration = trial_time(end);
 
+    % get steps for analysis
     trial_steps = get_steps(trial_data);
 
+    % --- Clear data by removing unwanted steps
+
     % TODO:
-    % exclude steps ongoing at start (stamp, standing on the other foot)
     % exclude first step, if diff(1., 2. step) too big
     % exclude steps ongoing at trial end
+
+    % remove steps if in contact at the start
+    sides = ["right", "left"];
+    for i = 1:numel(sides)
+        side = sides(i);
+        % check trial start
+        if trial_steps.(side)(1).start_time == trial_start_time
+            trial_steps.(side) = trial_steps.(side)(2:end);
+            % fprintf("Removed " + side + " foot step for contact at the beginning \n");
+        end
+        % check trial end
+        if trial_steps.(side)(end).end_time == trial_end_time
+            trial_steps.(side) = trial_steps.(side)(1:end-1);
+            % fprintf("Removed " + side + " foot step for contact at the end \n");
+        end
+    end
+
+    % ----- calculate analytic metrics -----
 
     % stride frequency
     n_stride_r = numel(trial_steps.right);
@@ -388,19 +423,53 @@ function trial = analyse_trial(trial_data)
     all_steps_time = sort(all_steps_time, 2);
 
     % calculate freq
-    step_period = mean(diff(all_steps_time));   % Seconds per step
-    step_freq = 60 / step_period;               % steps per minute
+    step_diffs = diff(all_steps_time);  % seconds
+    step_period = mean(step_diffs);     % Seconds per step
+    step_std = std(step_diffs);
+
+    % ----- Outlier removal ------
+
+    % how many stds difference from mean are ok
+    tolerance = 1.5;
+
+    % remove from the front
+    while abs(step_diffs(1) - step_period) > tolerance * step_std
+        % check if still possible
+        if numel(step_diffs) < 2
+            fprintf("not enough steps left \n")
+            break
+        end
+        step_diffs = step_diffs(2:end);
+        fprintf("removed step from the front \n")
+    end
+
+    % remove from the back
+    while abs(step_diffs(end) - step_period) > tolerance * step_std
+        % check if still possible
+        if numel(step_diffs) < 2
+            fprintf("not enough steps left \n")
+            break
+        end
+        step_diffs = step_diffs(1:end-1);
+        fprintf("removed step from the back \n")
+    end
+
+    % --------- calculate metrics and add to return struct --------
+    
+    % recalculate adapted metrics 
+    step_period = mean(step_diffs);     % Seconds per step
+    step_std = std(step_diffs);
+
+    step_freq = 60 / step_period;       % Steps per minute
 
     % write attributes in return structure
-    trial(1).n_stride_r = n_stride_r;
-    trial.n_stride_l = n_stride_l;
-    trial.stride_freq_r = stride_freq_r;
-    trial.stride_freq_l = stride_freq_l;
-    trial.stride_freq = stride_freq_mean;
+    trial(1).start = trial_start_time;
     trial.duration = trial_duration;
-    trial.start = trial_start_time;
+    trial.n_steps = numel(step_diffs) + 1;
     trial.step_period = step_period;
+    trial.step_period_std = step_std;
     trial.step_freq = step_freq;
+    trial.stride_freq = stride_freq_mean;
 
 
 end
@@ -569,9 +638,10 @@ end
 % The functions in this section should be called individually, getting prepared data as input.
 
 
-
 %% Testing
 % clearvars
 
-d = read_sole_data(4:7);
+% d = read_sole_data(4:7);
 
+
+cd = [read_condition_sole_data(4, "w", true).trials.n_steps]
