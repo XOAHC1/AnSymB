@@ -4,7 +4,7 @@ clearvars
 %% Read in Data
 
 % Read in sole data for one condition by one subject
-function condition_sole_data = read_condition_sole_data(subject, condition, manual_trials)
+function condition_sole_data = read_condition_sole_data(subject, condition, manual_trials, further_analysis)
 
     % Data Format:
     %     1   , 2     , 3     , 4     , 5     , 6     , 7     , 8     , 9     , 10    , 11
@@ -12,8 +12,11 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
     % 
     % Data is also accessable by collumn headers. Thoose change depending on the soles used, therefore access via index is to be preferred.
 
-    if nargin < 3
+    if nargin < 3 || isempty(manual_trials)
         manual_trials = false;
+    end
+    if nargin < 4 || isempty(further_analysis)
+        further_analysis = true;
     end
 
     if manual_trials
@@ -58,11 +61,14 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
     end 
 
     condition_sole_data.data = data;
-    condition_sole_data.steps = get_steps(data);
-    [condition_sole_data.trials, msf, std_freq] = get_trials(condition_sole_data, manual_trial_params);
     condition_sole_data.experiment_time = dt;
-    condition_sole_data.mean_step_freq = msf;
-    condition_sole_data.std_step_freq = std_freq;
+    condition_sole_data.steps = get_steps(data);
+    if further_analysis
+        [condition_sole_data.trials, msf, std_freq] = get_trials(condition_sole_data, manual_trial_params);
+        condition_sole_data.mean_step_freq = msf;
+        condition_sole_data.std_step_freq = std_freq;
+    end
+
 
     fprintf("Imported " + condition + " data for Subject " + subject + ". \n")
 
@@ -286,42 +292,48 @@ function [trials, mean_step_freq, freq_std] = get_trials(condition_data, manual_
     % generate trial sections
     if isempty(manual_trial_params)
 
-        % stamps to start trials
-        stamps_idx = strcmp([condition_data.steps.right.step_type], "stamp");
-        n_trials = sum(stamps_idx);
-        stamps = condition_data.steps.right(stamps_idx);
-        trial_starts = [stamps.peakTime] * 100;
+        try
+            % stamps to start trials
+            stamps_idx = strcmp([condition_data.steps.right.step_type], "stamp");
+            n_trials = sum(stamps_idx);
+            stamps = condition_data.steps.right(stamps_idx);
+            trial_starts = [stamps.peakTime] * 100;
 
-        % turning steps, to end trials
-        turning_steps_idx = strcmp([condition_data.steps.right.step_type], "turning");
+            % turning steps, to end trials
+            turning_steps_idx = strcmp([condition_data.steps.right.step_type], "turning");
 
-        % n_turning = sum(turning_steps_idx);
-        turning_steps = condition_data.steps.right(turning_steps_idx);
-        turning_step_times = [turning_steps.peakTime] * 100;
+            % n_turning = sum(turning_steps_idx);
+            turning_steps = condition_data.steps.right(turning_steps_idx);
+            turning_step_times = [turning_steps.peakTime] * 100;
 
-        % match up stamps and turning steps
-        last_trial_end_idx = 1;
-        trial_ends = zeros(n_trials, 1);
+            % match up stamps and turning steps
+            last_trial_end_idx = 1;
+            trial_ends = zeros(n_trials, 1);
 
-        exitt = false; % to leave, if no turning steps remain
-        for s = 1:n_trials
-            t = trial_starts(s);
-            while turning_step_times(last_trial_end_idx) < t
-                last_trial_end_idx = last_trial_end_idx + 1;
-                if last_trial_end_idx == numel(turning_step_times) % no turning steps after stamp
-                    exitt = true;
-                    break
+            exitt = false; % to leave, if no turning steps remain
+            for s = 1:n_trials
+                t = trial_starts(s);
+                while turning_step_times(last_trial_end_idx) < t
+                    last_trial_end_idx = last_trial_end_idx + 1;
+                    if last_trial_end_idx == numel(turning_step_times) % no turning steps after stamp
+                        exitt = true;
+                        break
+                    end
+                end
+                if exitt
+                    trial_starts = trial_starts(1:s-1);
+                    trial_ends = trial_ends(1:s-1);
+                    break 
+                else
+                    trial_ends(s) = turning_step_times(last_trial_end_idx);
                 end
             end
-            if exitt
-                trial_starts = trial_starts(1:s-1);
-                trial_ends = trial_ends(1:s-1);
-                break 
-            else
-                trial_ends(s) = turning_step_times(last_trial_end_idx);
-            end
+            n_trials = numel(trial_starts);
+        catch ME 
+            n_trials = 0;
+            trial_starts = [];
+            trial_ends = [];
         end
-        n_trials = numel(trial_starts);
 
     % get manually marked trial sections
     else
@@ -356,8 +368,8 @@ function [trials, mean_step_freq, freq_std] = get_trials(condition_data, manual_
         trial = analyse_trial(trial_data);
         trials(i) = trial; % Ensure the structure matches
     end
-
-    mean_step_freq = mean([trials.step_freq]);
+    
+    mean_step_freq = (mean([trials.step_freq] .* [trials.n_steps]))/sum([trials.n_steps]);
     freq_std = std([trials.step_freq]);
 
 end
@@ -382,12 +394,14 @@ function trial = analyse_trial(trial_data)
 
     % TODO:
     % exclude first step, if diff(1., 2. step) too big
-    % exclude steps ongoing at trial end
 
     % remove steps if in contact at the start
     sides = ["right", "left"];
     for i = 1:numel(sides)
         side = sides(i);
+        if numel(trial_steps.(side)) < 2
+            break
+        end
         % check trial start
         if trial_steps.(side)(1).start_time == trial_start_time
             trial_steps.(side) = trial_steps.(side)(2:end);
@@ -433,7 +447,7 @@ function trial = analyse_trial(trial_data)
     tolerance = 1.5;
 
     % remove from the front
-    while abs(step_diffs(1) - step_period) > tolerance * step_std
+    while numel(step_diffs) > 1 && abs(step_diffs(1) - step_period) > tolerance * step_std
         % check if still possible
         if numel(step_diffs) < 2
             fprintf("not enough steps left \n")
@@ -444,7 +458,7 @@ function trial = analyse_trial(trial_data)
     end
 
     % remove from the back
-    while abs(step_diffs(end) - step_period) > tolerance * step_std
+    while ~isempty(step_diffs) & abs(step_diffs(end) - step_period) > tolerance * step_std
         % check if still possible
         if numel(step_diffs) < 2
             fprintf("not enough steps left \n")
@@ -471,14 +485,13 @@ function trial = analyse_trial(trial_data)
     trial.step_freq = step_freq;
     trial.stride_freq = stride_freq_mean;
 
-
 end
 
 % extract trials from Data
 function manual_trial_marking(subject, condition)
 
     % read in data
-    cond_data = read_condition_sole_data(subject, condition);
+    cond_data = read_condition_sole_data(subject, condition, false, false);
     % plot data for evaluation, mark automated analysis for orientation
     plot_label = "Subject " + subject + " " + condition;
     plot_sole_data(cond_data, true, plot_label);
@@ -512,15 +525,20 @@ function manual_trial_marking(subject, condition)
 
 end
 
-function manually_mark_subject_trials(subject, special_conditions)
+function manually_mark_subject_trials(subject, special_conditions, skip_conditions)
 
-    if nargin < 2
+    if nargin < 2 || isempty(special_conditions)
         special_conditions = [];
+    end
+    if nargin < 3 || isempty(skip_conditions)
+        skip_conditions = [];
     end
 
     classical_conditions = ["br", "bvr", "vw", "w", "h", "vh"];
 
     conditions = cat(2, classical_conditions, special_conditions);
+
+    conditions = conditions(~contains(conditions, skip_conditions));
 
     for i = 1:numel(conditions)
         manual_trial_marking(subject, conditions(i))
@@ -637,11 +655,141 @@ end
 %% Analyse data
 % The functions in this section should be called individually, getting prepared data as input.
 
+% step_freq development over trials (in condition)
+function step_freq_adaptation = step_freq_adaptation_trials(subject, d, visualise, conditions)
+
+    % callable for one subjects and conditions
+    % default: all 'save' ones, all conditions
+    % return struct:
+    %   .condition
+    %       .trials             step_freq in jedem trial
+    %       .mean               mean_step_freq der condition
+    %       .std                step_freq_std
+    %       .adaptation         step_freq_difference to the next trials
+    %       .adaptation_mean    mean adaptation between trials
+    %       .adaptation_std     standard deviation (adaptaion)
+    %       .deviation          difference to the mean
+    %   .mean                   mean step_freq of the subject
+
+
+
+    if nargin < 1 || isempty(subject)
+        subjects = 4;
+    end
+
+    if nargin < 2 || isempty(d)
+        % --- get Data---
+        d = read_subject_sole_data(subject, true);
+    end
+    
+    if nargin < 3 || isempty(visualise)
+        visualise = false;
+    end
+
+    if nargin < 4 || isempty(conditions)
+        conditions = ["br", "bvr", "vw", "w", "h", "vh"];
+    end
+
+
+    % --- extract Data for subjects and conditions
+    for c_idx = 1:numel(conditions)
+        c = conditions(c_idx);
+        
+        % extract step_freqs
+        c_step_freqs = [d.(c).trials.step_freq];
+        
+        % Calculate adaptation metrics
+        adaptation = diff(c_step_freqs);
+
+        % write return structure       
+        step_freq_adaptation.(c).condition = c;
+        step_freq_adaptation.(c).trials = c_step_freqs;
+        step_freq_adaptation.(c).mean = mean(c_step_freqs);
+        step_freq_adaptation.(c).std = std(c_step_freqs);
+        step_freq_adaptation.(c).adaptation = adaptation;
+        step_freq_adaptation.(c).adaptation_mean = mean(adaptation);
+        step_freq_adaptation.(c).adaptation_std = std(adaptation);
+        step_freq_adaptation.(c).deviation_from_mean = c_step_freqs - mean(c_step_freqs);
+    end
+    
+    % Collect all trial frequencies across conditions
+    all_trials = [];
+    for c_idx = 1:numel(conditions)
+        all_trials = [all_trials, step_freq_adaptation.(conditions(c_idx)).trials];
+    end
+    step_freq_adaptation.mean_step_freq = mean(all_trials);
+   
+end
+
+% step_freq development over crowd density
+function step_freq_adaptation = step_freq_adaptation_conditions(subject, d, visualise)
+    
+        % return struct:
+        %   .step_freq_mean     subject's mean step_freq
+        %   .conditions         means for conditions
+        %   .deviation          deviation of condition from mean
+        %   .sequence           sequence of conditions (by name)
+
+        % usage:
+        %   sort trials by sequence or NPC density
+
+
+    % ---- handle inputs -------
+        if nargin < 1 || isempty(subject)
+            subject = 4;
+
+        end
+
+        if nargin < 2 || isempty(d)
+            d = read_subject_sole_data(subject, true);
+        end
+
+        if nargin < 3 || isempty(visualise)
+            visualise = false;
+        end
+
+    % ---- content -------
+        % initialise return struct
+    step_freq_adaptation = struct();
+    
+    % 
+    conditions = fieldnames(d);
+    n_conditions = numel(conditions);
+
+    step_freq_bl = d.br.mean_step_freq;
+
+    seq = [];
+
+    % for each condition, get step_freq, std in condition, difference to mean
+    for c_idx = 1:n_conditions
+        cond = conditions{c_idx};
+
+        % 
+        mean_step_freq = d.(cond).mean_step_freq;
+        std_step_freq = d.(cond).std_step_freq;
+        step_freq_adaptation.(cond).deviation = mean_step_freq - step_freq_bl;
+
+        % save for sequence
+        seq(c_idx) = d.(cond).place_in_sequence;
+
+    end
+
+    % - get condition sequence -
+    
+
+
+
+
+    % ------ write return struct
+    % step_freq_adaptation.sequence = condition_sequence;
+    
+end
+
+% step_freq development vr vs not
+
 
 %% Testing
-% clearvars
+clearvars
 
-% d = read_sole_data(4:7);
-
-
-cd = [read_condition_sole_data(4, "w", true).trials.n_steps]
+manual_trial_marking(8, "vh")
+% read_condition_sole_data(8, "vh")
