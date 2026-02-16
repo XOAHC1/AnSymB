@@ -119,7 +119,7 @@ end
 function sole_data = read_sole_data(subjects, use_manual_trial_borders)
 
     if nargin < 1 || isempty(subjects)
-        subjects = 4:7;
+        subjects = 4:8;
     end
 
     if nargin < 2 || isempty(use_manual_trial_borders)
@@ -360,6 +360,7 @@ function [trials, mean_step_freq, freq_std] = get_trials(condition_data, manual_
         'step_period',      {}, ...
         'step_period_std',  {}, ...
         'step_freq',        {}, ...
+        'step_freq_std',    {}, ...
         'stride_freq',      {} ...
         );
     
@@ -444,10 +445,10 @@ function trial = analyse_trial(trial_data)
     % ----- Outlier removal ------
 
     % how many stds difference from mean are ok
-    tolerance = 1.5;
+    TOLERANCE = 1.5;
 
     % remove from the front
-    while numel(step_diffs) > 1 && abs(step_diffs(1) - step_period) > tolerance * step_std
+    while numel(step_diffs) > 1 && abs(step_diffs(1) - step_period) > TOLERANCE * step_std
         % check if still possible
         if numel(step_diffs) < 2
             fprintf("not enough steps left \n")
@@ -458,7 +459,7 @@ function trial = analyse_trial(trial_data)
     end
 
     % remove from the back
-    while ~isempty(step_diffs) & abs(step_diffs(end) - step_period) > tolerance * step_std
+    while ~isempty(step_diffs) & abs(step_diffs(end) - step_period) > TOLERANCE * step_std
         % check if still possible
         if numel(step_diffs) < 2
             fprintf("not enough steps left \n")
@@ -473,8 +474,9 @@ function trial = analyse_trial(trial_data)
     % recalculate adapted metrics 
     step_period = mean(step_diffs);     % Seconds per step
     step_std = std(step_diffs);
-
+    
     step_freq = 60 / step_period;       % Steps per minute
+    step_freq_std = std(step_freq);
 
     % write attributes in return structure
     trial(1).start = trial_start_time;
@@ -483,6 +485,8 @@ function trial = analyse_trial(trial_data)
     trial.step_period = step_period;
     trial.step_period_std = step_std;
     trial.step_freq = step_freq;
+    trial.step_freq_std = step_freq_std;
+
     trial.stride_freq = stride_freq_mean;
 
 end
@@ -559,17 +563,17 @@ function plot_sole_data(condition_data, mark_steps, plotLabel)
     %       string, optional
 
     % ---- Input checks ----
-    if nargin < 1 || isempty(condition_data)
-        error("Input data must be a non-empty struct with the fields .data and .steps.");
-    end
+        if nargin < 1 || isempty(condition_data)
+            error("Input data must be a non-empty struct with the fields .data and .steps.");
+        end
 
-    if nargin < 2 || isempty(mark_steps)
-        mark_steps = false;
-    end
+        if nargin < 2 || isempty(mark_steps)
+            mark_steps = false;
+        end
 
-    if nargin < 3 || isempty(plotLabel)
-        plotLabel = "some Data";
-    end
+        if nargin < 3 || isempty(plotLabel)
+            plotLabel = "some Data";
+        end
 
     % get sole data
     data = condition_data.data;
@@ -722,74 +726,115 @@ function step_freq_adaptation = step_freq_adaptation_trials(subject, d, visualis
 end
 
 % step_freq development over crowd density
-function step_freq_adaptation = step_freq_adaptation_conditions(subject, d, visualise)
+function params = step_freq_adaptation_conditions(subjects, d, visualise)
     
         % return struct:
-        %   .step_freq_mean     subject's mean step_freq
-        %   .conditions         means for conditions
-        %   .deviation          deviation of condition from mean
-        %   .sequence           sequence of conditions (by name)
-
-        % usage:
+        %   matrix with dims: 
+        %       subjects, conditions, params
+        %   Params: 
+        %       sequence, msfs, stds
         %   sort trials by sequence or NPC density
 
 
     % ---- handle inputs -------
-        if nargin < 1 || isempty(subject)
-            subject = 4;
+            if nargin < 1 || isempty(subjects)
+                subjects = 4;
 
-        end
+            end
 
-        if nargin < 2 || isempty(d)
-            d = read_subject_sole_data(subject, true);
-        end
+            if nargin < 2 || isempty(d)
+                d = read_sole_data(subjects, true);
+            end
 
-        if nargin < 3 || isempty(visualise)
-            visualise = false;
-        end
+            if nargin < 3 || isempty(visualise)
+                visualise = false;
+            end
 
     % ---- content -------
         % initialise return struct
-    step_freq_adaptation = struct();
+
     
     % 
-    conditions = fieldnames(d);
+    conditions = ["br", "bvr", "vw", "w", "h", "vh"];
     n_conditions = numel(conditions);
+    n_subjects = numel(subjects);
 
-    step_freq_bl = d.br.mean_step_freq;
+    % return matrix
+    params = zeros(n_subjects, n_conditions, 6);
 
-    seq = [];
+    for s_idx = 1:n_subjects
+        s = subjects(s_idx);
+        % get subject data
+        sd = d.("s"+s);
+        bl_step_freq = sd.bvr.mean_step_freq;
 
-    % for each condition, get step_freq, std in condition, difference to mean
-    for c_idx = 1:n_conditions
-        cond = conditions{c_idx};
+        % for each condition, get step_freq, std in condition, difference to mean
+        for c_idx = 1:n_conditions
+            cond = conditions(c_idx);
 
-        % 
-        mean_step_freq = d.(cond).mean_step_freq;
-        std_step_freq = d.(cond).std_step_freq;
-        step_freq_adaptation.(cond).deviation = mean_step_freq - step_freq_bl;
+            % save params
+            params(s_idx, c_idx, :) = [...
+                sd.(cond).place_in_sequence, ... % sequence
+                c_idx, ...
+                sd.(cond).mean_step_freq, ...    % msf
+                sd.(cond).std_step_freq, ...     % ssf
+                sd.(cond).mean_step_freq - bl_step_freq, ...
+                subjects(s_idx), ...
+            ];
 
-        % save for sequence
-        seq(c_idx) = d.(cond).place_in_sequence;
-
+        end
     end
 
-    % - get condition sequence -
-    
+    if visualise
+        % t = "aufgerufen"
+        visualise_adaptation(params, "condition adaptation");
+    end
 
-
-
-
-    % ------ write return struct
-    % step_freq_adaptation.sequence = condition_sequence;
-    
 end
 
-% step_freq development vr vs not
+% visualise step_freq adaptation to scenarios. 
+% params: matrix, (:, 1) -> conditions, (:, 2) -> sfs
+function visualise_adaptation(params, fig_title)
 
+    if nargin < 2 
+        title = "sf adaptation";
+    end
+
+
+    conditions = ["br", "bvr", "vw", "w", "h", "vh"];
+    n_conditions = numel(conditions);
+    figure("Name", fig_title)
+
+    % p = params
+    seq = params(:, :, 1);
+    conds = conditions(params(:, :, 2));
+    msfs = params(:, :, 3);
+    stds = params(:, :, 4);
+    divergence = params(:, :, 5);
+    subjects = params(:, :, 6);
+    subjects = subjects(:, 1);
+
+    n_subjects = numel(subjects);
+    
+    % --- grouped by condition
+    b = bar(msfs');
+    hold on
+    x = [];
+    for s = 1:n_subjects
+        x = [x ; b(s).XEndPoints];
+    end
+    errorbar(x', msfs', stds', "k", "LineStyle", "none")
+    hold off
+
+    xticklabels(conds)
+    ylabel("Mean Step Frequency")
+    xlabel("condition")
+    legend("s "+ subjects)
+
+
+end
 
 %% Testing
 clearvars
 
-manual_trial_marking(8, "vh")
-% read_condition_sole_data(8, "vh")
+step_freq_adaptation_conditions(4:8, [] , true);
