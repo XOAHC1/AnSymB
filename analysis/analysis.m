@@ -360,7 +360,6 @@ function [trials, mean_step_freq, freq_std] = get_trials(condition_data, manual_
         'step_period',      {}, ...
         'step_period_std',  {}, ...
         'step_freq',        {}, ...
-        'step_freq_std',    {}, ...
         'stride_freq',      {} ...
         );
     
@@ -476,7 +475,6 @@ function trial = analyse_trial(trial_data)
     step_std = std(step_diffs);
     
     step_freq = 60 / step_period;       % Steps per minute
-    step_freq_std = std(step_freq);
 
     % write attributes in return structure
     trial(1).start = trial_start_time;
@@ -485,7 +483,6 @@ function trial = analyse_trial(trial_data)
     trial.step_period = step_period;
     trial.step_period_std = step_std;
     trial.step_freq = step_freq;
-    trial.step_freq_std = step_freq_std;
 
     trial.stride_freq = stride_freq_mean;
 
