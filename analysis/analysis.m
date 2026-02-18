@@ -784,7 +784,7 @@ function params = step_freq_adaptation_conditions(subjects, d, visualise)
 
     if visualise
         % t = "aufgerufen"
-        visualise_adaptation(params, "condition adaptation");
+        visualise_adaptation(params, "condition-adaptation");
     end
 
 end
@@ -800,7 +800,7 @@ function visualise_adaptation(params, fig_title)
 
     conditions = ["br", "bvr", "vw", "w", "h", "vh"];
     n_conditions = numel(conditions);
-    figure("Name", fig_title)
+  
 
     % p = params
     seq = params(:, :, 1);
@@ -811,27 +811,74 @@ function visualise_adaptation(params, fig_title)
     subjects = params(:, :, 6);
     subjects = subjects(:, 1);
 
-    n_subjects = numel(subjects);
-    
-    % --- grouped by condition
-    b = bar(msfs');
-    hold on
-    x = [];
-    for s = 1:n_subjects
-        x = [x ; b(s).XEndPoints];
-    end
-    errorbar(x', msfs', stds', "k", "LineStyle", "none")
-    hold off
+    % --- grouped by condition, split by subject
+    data = msfs';
+    ers = stds';
+    xl = "Mean Step Frequency [steps/min]";
+    yl = "Condition";
 
-    xticklabels(conds)
-    ylabel("Mean Step Frequency")
-    xlabel("condition")
-    legend("s "+ subjects)
+    create_bar_plot(subjects, data, conds', ers, fig_title, xl, yl)
+
+    % -------- divergence from baseline relative to mean (%)
+    data = divergence' ./ msfs';
+    xl = "step frequency divergence from baseline [% of baseline]";
+
+
+    create_bar_plot(subjects, data, conds', [], "diveregence-from-baseline-relative-to-mean", xl, yl)
+
+    % --- divergence from bl relative to mean, mean over subjects
+    d = mean(data, 2);
+    c = conds(1, :);
+    s = std(data, 0, 2);
+
+    create_bar_plot("mean", d, c, s, "mean-divergence-from-mean-step-freq", xl, yl);
 
 
 end
 
-%% Testing
-clearvars
+function create_bar_plot(subjects, x_data, y_data, ers, fig_title, xl, yl)
+    
+    save = false;
 
-step_freq_adaptation_conditions(4:8, [] , true);
+    error_bars = true;
+    if nargin < 4 || isempty(ers)
+        error_bars = false;
+    end
+    if nargin < 5
+        fig_title = "generic title";
+    end
+
+    n_subjects = numel(subjects);
+
+    fig = figure("Name", fig_title);
+    b = bar(x_data);
+
+    if error_bars
+        hold on
+        x = [];
+        for s = 1:n_subjects
+            x = [x ; b(s).XEndPoints];
+        end
+        errorbar(x', x_data, ers, "k", "LineStyle", "none")
+        hold off
+    end
+
+    xticklabels(y_data)
+    xlabel(xl)
+    ylabel(yl)
+    legend("s "+ subjects)
+    title(fig_title)
+
+    if save
+        filename = "figures\" + fig_title + ".pdf";
+        saveas(fig, filename);
+    end
+end
+
+%% Testing
+% clearvars
+% d = read_sole_data(4:8);
+
+% step_freq_adaptation_conditions(4:8, d , true);
+
+read_condition_sole_data(4, "vh", true).trials
