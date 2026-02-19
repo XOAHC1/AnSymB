@@ -369,7 +369,7 @@ function [trials, mean_step_freq, freq_std] = get_trials(condition_data, manual_
         trials(i) = trial; % Ensure the structure matches
     end
     
-    mean_step_freq = (mean([trials.step_freq] .* [trials.n_steps]))/sum([trials.n_steps]);
+    mean_step_freq = sum([trials.step_freq] .* [trials.n_steps]) / sum([trials.n_steps]);
     freq_std = std([trials.step_freq]);
 
 end
@@ -539,7 +539,9 @@ function manually_mark_subject_trials(subject, special_conditions, skip_conditio
 
     conditions = cat(2, classical_conditions, special_conditions);
 
-    conditions = conditions(~contains(conditions, skip_conditions));
+    if ~isempty(skip_conditions)
+        conditions = conditions(~contains(conditions, skip_conditions));
+    end
 
     for i = 1:numel(conditions)
         manual_trial_marking(subject, conditions(i))
@@ -675,7 +677,7 @@ function step_freq_adaptation = step_freq_adaptation_trials(subject, d, visualis
 
 
     if nargin < 1 || isempty(subject)
-        subjects = 4;
+        subject = 4;
     end
 
     if nargin < 2 || isempty(d)
@@ -814,17 +816,18 @@ function visualise_adaptation(params, fig_title)
     % --- grouped by condition, split by subject
     data = msfs';
     ers = stds';
-    xl = "Mean Step Frequency [steps/min]";
-    yl = "Condition";
+    xl = "Condition";
+    yl = "Mean Step Frequency [steps/min]";
 
     create_bar_plot(subjects, data, conds', ers, fig_title, xl, yl)
 
     % -------- divergence from baseline relative to mean (%)
-    data = divergence' ./ msfs';
-    xl = "step frequency divergence from baseline [% of baseline]";
+    baselines = repmat(msfs(:, 2), 1, n_conditions);
+    data = (divergence' ./ baselines') * 100 ;
+    yl = "step frequency divergence from baseline [% of baseline]";
 
 
-    create_bar_plot(subjects, data, conds', [], "diveregence-from-baseline-relative-to-mean", xl, yl)
+    create_bar_plot(subjects, data, conds', [], "diveregence-from-baseline-relative-to-baseline", xl, yl)
 
     % --- divergence from bl relative to mean, mean over subjects
     d = mean(data, 2);
@@ -832,6 +835,13 @@ function visualise_adaptation(params, fig_title)
     s = std(data, 0, 2);
 
     create_bar_plot("mean", d, c, s, "mean-divergence-from-mean-step-freq", xl, yl);
+
+    % ---- divergence, sorted by sequence ----
+    [~, idcs] = sort(seq');
+    data = mean(data(idcs), 2);
+    s = std(data, 0, 2);
+
+    create_bar_plot("mean", data, 1:numel(data), s, "mean-dev-sorted-by-sequence", xl, yl);
 
 
 end
@@ -876,9 +886,4 @@ function create_bar_plot(subjects, x_data, y_data, ers, fig_title, xl, yl)
 end
 
 %% Testing
-% clearvars
-% d = read_sole_data(4:8);
-
-% step_freq_adaptation_conditions(4:8, d , true);
-
-read_condition_sole_data(4, "vh", true).trials
+clearvars
