@@ -135,7 +135,7 @@ function sole_data = read_sole_data(subjects, use_manual_trial_borders)
 end
 
 % Read in HMD Data (one condition)
-function hmd_data = read_condition_hmd_data(subject, condition)
+function [mean_vel, mean_acc, max_vel, max_acc, hmd_data] = read_condition_hmd_data(subject, condition)
 
     % Read Data
     hmd_data = struct();
@@ -149,6 +149,9 @@ function hmd_data = read_condition_hmd_data(subject, condition)
     
     for i = 1:9
         idcs = trial_number == i;
+        if sum(idcs) == 0
+            continue
+        end
         trial = data(idcs, :);
 
         trial_result = analyse_hmd_trial(trial);
@@ -157,10 +160,10 @@ function hmd_data = read_condition_hmd_data(subject, condition)
     end
 
     % Write results
-    hmd_data.mean_vel = mean([hmd_data.trial_data.mean_speed]);
-    hmd_data.mean_acc = mean([hmd_data.trial_data.mean_acc]);
-    hmd_data.max_vel = max([hmd_data.trial_data.max_speed]);
-    hmd_data.max_acc = max([hmd_data.trial_data.max_acc]);
+    mean_vel = mean([hmd_data.trial_data.mean_vel]);
+    mean_acc = mean([hmd_data.trial_data.mean_acc]);
+    max_vel = max([hmd_data.trial_data.max_speed]);
+    max_acc = max([hmd_data.trial_data.max_acc]);
 
 
 end
@@ -172,13 +175,19 @@ function hmd_data = read_subject_hmd_data(subject)
     CONDITIONS = ["bvr", "vw", "w", "h", "vh"];
 
     hmd_data = struct();
+    hmd_data.conditions = struct([]);
 
     for cond_idx = 1:numel(HMD_CONDITIONS)
-        hmd_data.(CONDITIONS(cond_idx))(cond_idx) = read_condition_hmd_data(subject, HMD_CONDITIONS(cond_idx));
+        [hmd_data.conditions(cond_idx).mean_vel, ...
+        hmd_data.conditions(cond_idx).mean_acc, ...
+        hmd_data.conditions(cond_idx).max_vel, ...
+        hmd_data.conditions(cond_idx).max_acc, ...
+        hmd_data.(CONDITIONS(cond_idx))] = read_condition_hmd_data(subject, HMD_CONDITIONS(cond_idx));
     end
 
 end
 
+% read all hmd data
 function hmd_data = read_hmd_data(subjects)
 
     if nargin < 1
@@ -188,7 +197,6 @@ function hmd_data = read_hmd_data(subjects)
     hmd_data = struct();
 
     for s = 1:numel(subjects)
-        log = s
         hmd_data.("s"+subjects(s)) = read_subject_hmd_data(subjects(s));
     end
 end
@@ -628,7 +636,7 @@ function trial_result = analyse_hmd_trial(trial)
     vel = sqrt(diff_x .^2 + diff_y .^2) ./ dt;       % m/s
     acc = diff(vel) / mean(dt);                     % m/s^2
 
-    trial_result.mean_speed = mean(vel);
+    trial_result.mean_vel = mean(vel);
     trial_result.max_speed = max(vel);
     trial_result.max_acc = max(abs(acc));
     trial_result.mean_acc = mean(abs(acc));
@@ -741,6 +749,56 @@ function plot_step_markers(step_times, y_pos, color, marker)
         plot(step_times, y_pos, "Color", color, "Marker", marker);
     end
 end
+
+% visualise hmd data
+% @param hmd_data: top level, i.e. Layers for subjects and conditions
+function visualise_velocity(subjects, hmd_data)
+
+    if nargin < 2 || isempty(hmd_data)
+        hmd_data = read_hmd_data(subjects);
+    end
+
+    NSUBJECTS = numel(subjects);
+    NCONDITIONS = 5;
+
+    velocities = zeros(NSUBJECTS, NCONDITIONS);
+    accelerations = zeros(NSUBJECTS, NCONDITIONS);
+
+    for s_idx = 1:NSUBJECTS
+        s_data_conds = hmd_data.("s"+subjects(s_idx)).conditions;
+        velocities(s_idx, :) = [s_data_conds.mean_vel];
+        accelerations(s_idx, :) = [s_data_conds.mean_acc];
+    end
+
+    % --- plot absolute Velocities
+
+    y_data = velocities';
+    x_labels = ["bvr", "vw", "w", "h", "vh"];
+    ers = [];
+    fig_title = "Velocity-in-conditions";
+    xl = "Conditions";
+    yl = "velocity [m/s]";
+
+    create_bar_plot(subjects, y_data, x_labels, ers, fig_title, xl, yl);
+
+    % Deviation from Baseline
+    y_data = (velocities - velocities(:, 1))';
+    fig_title = "Deviation from Baseline";
+    yl = "velocity Deviation";
+
+    create_bar_plot(subjects, y_data, x_labels, ers, fig_title, xl, yl);
+    
+    % plot mean Deviation from Baseline (relative)
+    dev = (velocities - velocities(:, 1)) ./ velocities(:, 1);
+
+    y_data = mean(dev)';
+    ers = std(dev)';
+    yl = "Deviation from the Baseline relative"
+
+    create_bar_plot("mean", y_data, x_labels, ers, fig_title, xl, yl);
+        
+end
+
 
 %% Analyse data
 % The functions in this section should be called individually, getting prepared data as input.
@@ -933,7 +991,7 @@ function visualise_adaptation(params, fig_title)
 
 end
 
-function create_bar_plot(subjects, x_data, y_data, ers, fig_title, xl, yl)
+function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
     
     save = false;
 
@@ -948,7 +1006,7 @@ function create_bar_plot(subjects, x_data, y_data, ers, fig_title, xl, yl)
     n_subjects = numel(subjects);
 
     fig = figure("Name", fig_title);
-    b = bar(x_data);
+    b = bar(data);
 
     if error_bars
         hold on
@@ -956,11 +1014,11 @@ function create_bar_plot(subjects, x_data, y_data, ers, fig_title, xl, yl)
         for s = 1:n_subjects
             x = [x ; b(s).XEndPoints];
         end
-        errorbar(x', x_data, ers, "k", "LineStyle", "none")
+        errorbar(x', data, ers, "k", "LineStyle", "none")
         hold off
     end
 
-    xticklabels(y_data)
+    xticklabels(x_labels)
     xlabel(xl)
     ylabel(yl)
     legend("s "+ subjects)
@@ -975,4 +1033,4 @@ end
 %% Testing
 clearvars
 
-d = read_hmd_data(4:21)
+visualise_velocity(4:21)
