@@ -134,6 +134,66 @@ function sole_data = read_sole_data(subjects, use_manual_trial_borders)
     end
 end
 
+% Read in HMD Data (one condition)
+function hmd_data = read_condition_hmd_data(subject, condition)
+
+    % Read Data
+    hmd_data = struct();
+    DataPath = "subject_data\vr_data\" + subject + "\";
+    filename = sprintf('%i_%s_experiment.csv', subject, condition);
+
+    data = readmatrix(DataPath + filename);
+
+    % get first analysis
+    trial_number = data(:, 2);
+    
+    for i = 1:9
+        idcs = trial_number == i;
+        trial = data(idcs, :);
+
+        trial_result = analyse_hmd_trial(trial);
+        
+        hmd_data.trial_data(i) = trial_result;
+    end
+
+    % Write results
+    hmd_data.mean_vel = mean([hmd_data.trial_data.mean_speed]);
+    hmd_data.mean_acc = mean([hmd_data.trial_data.mean_acc]);
+    hmd_data.max_vel = max([hmd_data.trial_data.max_speed]);
+    hmd_data.max_acc = max([hmd_data.trial_data.max_acc]);
+
+
+end
+
+% Read in HMD Data (one subject)
+function hmd_data = read_subject_hmd_data(subject)
+
+    HMD_CONDITIONS = ["Baseline", "very weak", "weak", "heavy", "very heavy"];
+    CONDITIONS = ["bvr", "vw", "w", "h", "vh"];
+
+    hmd_data = struct();
+
+    for cond_idx = 1:numel(HMD_CONDITIONS)
+        hmd_data.(CONDITIONS(cond_idx))(cond_idx) = read_condition_hmd_data(subject, HMD_CONDITIONS(cond_idx));
+    end
+
+end
+
+function hmd_data = read_hmd_data(subjects)
+
+    if nargin < 1
+        subjects = 4:21;
+    end
+
+    hmd_data = struct();
+
+    for s = 1:numel(subjects)
+        log = s
+        hmd_data.("s"+subjects(s)) = read_subject_hmd_data(subjects(s));
+    end
+end
+
+
 %% prepare Data for analysis
 
 % analyse step parameters in data
@@ -548,6 +608,33 @@ function manually_mark_subject_trials(subject, special_conditions, skip_conditio
     end
 end
 
+% analyse hmd data
+function trial_result = analyse_hmd_trial(trial)
+    trial_result = struct();
+
+    time_stamp = trial(:, 1);
+
+    % start_time = time_stamp(1);
+    % end_time = time_stamp(end); 
+
+    dt = diff(time_stamp);
+
+    pos_x = trial(:, 3);
+    pos_y = trial(:, 5);
+
+    diff_x = diff(pos_x);
+    diff_y = diff(pos_y);
+
+    vel = sqrt(diff_x .^2 + diff_y .^2) ./ dt;       % m/s
+    acc = diff(vel) / mean(dt);                     % m/s^2
+
+    trial_result.mean_speed = mean(vel);
+    trial_result.max_speed = max(vel);
+    trial_result.max_acc = max(abs(acc));
+    trial_result.mean_acc = mean(abs(acc));
+
+end
+
 %% Visualise data 
 
 function plot_sole_data(condition_data, mark_steps, plotLabel)
@@ -887,3 +974,5 @@ end
 
 %% Testing
 clearvars
+
+d = read_hmd_data(4:21)
