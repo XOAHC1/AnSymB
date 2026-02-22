@@ -1,1 +1,0 @@
-sprintf('%c test', 11)

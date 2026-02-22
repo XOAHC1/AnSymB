@@ -796,13 +796,13 @@ function visualise_velocity(subjects, hmd_data)
 
     % Deviation from Baseline
     y_data = (velocities - velocities(:, 1))';
-    fig_title = "Deviation from Baseline";
+    fig_title = "Velocity Deviation from Baseline";
     yl = "velocity Deviation";
 
     create_bar_plot(subjects, y_data, x_labels, ers, fig_title, xl, yl);
     
     % plot mean Deviation from Baseline (relative)
-    dev = (velocities - velocities(:, 1)) ./ velocities(:, 1);
+    dev = ((velocities - velocities(:, 1)) ./ velocities(:, 1)) * 100; % [%]
 
     if isempty(dev)
         log = "empty dev: "
@@ -810,7 +810,7 @@ function visualise_velocity(subjects, hmd_data)
 
     y_data = mean(dev)';
     ers = std(dev)';
-    yl = "Deviation from the Baseline relative";
+    yl = "vel Deviation from the Baseline relative [%]";
 
     create_bar_plot("mean", y_data, x_labels, ers, fig_title, xl, yl);
         
@@ -985,25 +985,30 @@ function visualise_adaptation(params, fig_title)
 
     % -------- divergence from baseline relative to mean (%)
     baselines = repmat(msfs(:, 2), 1, n_conditions);
-    data = (divergence' ./ baselines') * 100 ;
+    rel_data = (divergence' ./ baselines') * 100;
     yl = "step frequency divergence from baseline [% of baseline]";
 
 
-    create_bar_plot(subjects, data, conds', [], "diveregence-from-baseline-relative-to-baseline", xl, yl)
+    create_bar_plot(subjects, rel_data, conds', [], "diveregence-from-baseline-relative-to-baseline", xl, yl)
 
     % --- divergence from bl relative to mean, mean over subjects
-    d = mean(data, 2);
+    d = mean(rel_data, 2);
     c = conds(1, :);
-    s = std(data, 0, 2);
+    s = std(rel_data, 0, 2);
 
     create_bar_plot("mean", d, c, s, "mean-divergence-from-mean-step-freq", xl, yl);
 
     % ---- divergence, sorted by sequence ----
     [~, idcs] = sort(seq');
-    data = mean(data(idcs), 2);
-    s = std(data, 0, 2);
+    % seq_data = rel_data(idcs)
 
-    create_bar_plot("mean", data, 1:numel(data), s, "mean-dev-sorted-by-sequence", xl, yl);
+    cols = repmat(1:size(rel_data,2), size(rel_data,1), 1);
+    seq_data = rel_data(sub2ind(size(rel_data), idcs, cols));
+
+    d = mean(seq_data, 2);
+    s = std(seq_data, 0, 2);
+
+    create_bar_plot("mean", d, 1:numel(d), s, "sf_mean-dev-sorted-by-sequence", xl, yl);
 
 
 end
@@ -1047,8 +1052,21 @@ function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
     end
 end
 
+function show_analysis(subjects)
+    if nargin < 1 || isempty(subjects)
+        subjects = 4:9;
+    end
+
+    % show sole data
+    step_freq_adaptation_conditions(subjects, [], true);
+
+    % show hmd_data
+    visualise_velocity(subjects)
+end
+
+    
 %% Testing
 clearvars
 
-visualise_velocity(4:21)
-% sd = read_sole_data(4:21, false);
+show_analysis()
+
