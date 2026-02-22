@@ -149,7 +149,7 @@ function [mean_vel, mean_acc, max_vel, max_acc, hmd_data] = read_condition_hmd_d
     % get first analysis
     trial_number = data(:, 2);
     
-    for i = 1:9
+    for i = 1:20
         idcs = trial_number == i;
         if sum(idcs) == 0
             continue
@@ -174,6 +174,7 @@ end
 function hmd_data = read_subject_hmd_data(subject)
 
     HMD_CONDITIONS = ["Baseline", "very weak", "weak", "heavy", "very heavy"];
+    % HMD_CONDITIONS = ["Baseline", "very weak", "weak"];
     CONDITIONS = ["bvr", "vw", "w", "h", "vh"];
 
     hmd_data = struct();
@@ -622,11 +623,20 @@ end
 function trial_result = analyse_hmd_trial(trial)
     trial_result = struct();
 
+    % remove start (by moving)
+    start_pos_x = trial(1, 3);
+    raw_pos_x = trial(:, 3);
+
+    start_puffer = 0.2;          %m
+
+    idcs = abs(raw_pos_x - start_pos_x) > start_puffer;
+    if sum(idcs) < 100
+        n_timesteps = sum(idcs)
+    end
+    trial = trial(idcs, :);
+
+    % retrieve relevant data
     time_stamp = trial(:, 1);
-
-    % start_time = time_stamp(1);
-    % end_time = time_stamp(end); 
-
     dt = diff(time_stamp);
 
     pos_x = trial(:, 3);
@@ -638,6 +648,7 @@ function trial_result = analyse_hmd_trial(trial)
     vel = sqrt(diff_x .^2 + diff_y .^2) ./ dt;       % m/s
     acc = diff(vel) / mean(dt);                     % m/s^2
 
+    % write results
     trial_result.mean_vel = mean(vel);
     trial_result.max_speed = max(vel);
     trial_result.max_acc = max(abs(acc));
@@ -793,9 +804,13 @@ function visualise_velocity(subjects, hmd_data)
     % plot mean Deviation from Baseline (relative)
     dev = (velocities - velocities(:, 1)) ./ velocities(:, 1);
 
+    if isempty(dev)
+        log = "empty dev: "
+    end
+
     y_data = mean(dev)';
     ers = std(dev)';
-    yl = "Deviation from the Baseline relative"
+    yl = "Deviation from the Baseline relative";
 
     create_bar_plot("mean", y_data, x_labels, ers, fig_title, xl, yl);
         
@@ -1033,17 +1048,7 @@ function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
 end
 
 %% Testing
-% clearvars
+clearvars
 
-% visualise_velocity(4:21)
+visualise_velocity(4:21)
 % sd = read_sole_data(4:21, false);
-% hmd_data = read_hmd_data(4:21);
-
-p = [];
-for i = 1:numel(CONDITIONS)
-    cond = CONDITIONS(i);
-    p(i) = sd.s10.(cond).place_in_sequence;
-end
-
-[~, t] = sort(p);
-log = CONDITIONS(t)
