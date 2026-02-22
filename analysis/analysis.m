@@ -796,7 +796,7 @@ function visualise_velocity(subjects, hmd_data)
 
     % Deviation from Baseline
     y_data = (velocities - velocities(:, 1))';
-    fig_title = "Velocity Deviation from Baseline";
+    fig_title = "Velocity-Deviation-from-Baseline";
     yl = "velocity Deviation";
 
     create_bar_plot(subjects, y_data, x_labels, ers, fig_title, xl, yl);
@@ -810,6 +810,7 @@ function visualise_velocity(subjects, hmd_data)
 
     y_data = mean(dev)';
     ers = std(dev)';
+    fig_title = "relative-vel-dev-from-baseline";
     yl = "vel Deviation from the Baseline relative [%]";
 
     create_bar_plot("mean", y_data, x_labels, ers, fig_title, xl, yl);
@@ -1008,7 +1009,7 @@ function visualise_adaptation(params, fig_title)
     d = mean(seq_data, 2);
     s = std(seq_data, 0, 2);
 
-    create_bar_plot("mean", d, 1:numel(d), s, "sf_mean-dev-sorted-by-sequence", xl, yl);
+    create_bar_plot("mean", d, 1:numel(d), s, "sf-mean-dev-sorted-by-sequence", xl, yl);
 
 
 end
