@@ -1,5 +1,7 @@
 %% Define Functions
-clearvars
+% clearvars
+
+CONDITIONS = ["br", "bvr", "vw", "w", "h", "vh"];
 
 %% Read in Data
 
@@ -1031,6 +1033,17 @@ function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
 end
 
 %% Testing
-clearvars
+% clearvars
 
-visualise_velocity(4:21)
+% visualise_velocity(4:21)
+% sd = read_sole_data(4:21, false);
+% hmd_data = read_hmd_data(4:21);
+
+p = [];
+for i = 1:numel(CONDITIONS)
+    cond = CONDITIONS(i);
+    p(i) = sd.s10.(cond).place_in_sequence;
+end
+
+[~, t] = sort(p);
+log = CONDITIONS(t)
