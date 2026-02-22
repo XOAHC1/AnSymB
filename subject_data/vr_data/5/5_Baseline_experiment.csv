@@ -1,4 +1,4 @@
-timestamp, HMD_x, HMD_y,HMD_z
+timestamp, trial, HMD_x, HMD_y,HMD_z
 
 # --- Trial 1 start ---
 133.637,1,-39.3551,1.7671,-1.3113
