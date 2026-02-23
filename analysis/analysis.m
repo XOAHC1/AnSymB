@@ -1094,7 +1094,11 @@ function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
     xticklabels(x_labels)
     xlabel(xl)
     ylabel(yl)
+
+    % remove legend if inpractical
+    if n_subjects > 1 && n_subjects < 12
     legend("s "+ string(subjects), 'Location', 'southoutside', 'Orientation', 'horizontal');
+    end
 
     title(fig_title)
 
@@ -1104,13 +1108,18 @@ function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
     end
 end
 
-function show_analysis(subjects)
+function show_analysis(subjects, sd)
+    
     if nargin < 1 || isempty(subjects)
         subjects = 4:9;
     end
 
+    if nargin < 2 || isempty(sd)
+        sd = read_sole_data(subjects, true);
+    end
+
     % show sole data
-    step_freq_adaptation_conditions(subjects, [], true);
+    step_freq_adaptation_conditions(subjects, sd, true);
 
     % show hmd_data
     visualise_velocity(subjects)
@@ -1118,6 +1127,11 @@ end
 
     
 %% Testing
-clearvars
+% clearvars
 
-show_analysis(4:10)
+% show_analysis(4:10)
+
+% visualise_velocity(4:21)
+
+% sd = read_subject_sole_data(4)
+sd.br.trials
