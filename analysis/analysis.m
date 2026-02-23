@@ -811,15 +811,16 @@ function visualise_velocity(subjects, hmd_data)
 
     create_bar_plot(subjects, y_data, x_labels, ers, fig_title, xl, yl);
 
-    % Deviation from Baseline
-    y_data = (velocities - velocities(:, 1))';
-    fig_title = "Velocity-Deviation-from-Baseline";
-    yl = "velocity Deviation";
+    % Relative deviation from Baseline
+    dev = ((velocities - velocities(:, 1)) ./ velocities(:, 1)) * 100; % [%]
+
+    y_data = dev';
+    fig_title = "Relative-Velocity-Deviation";
+    yl = "vel Deviation from the Baseline relative [%]";
 
     create_bar_plot(subjects, y_data, x_labels, ers, fig_title, xl, yl);
     
     % plot mean Deviation from Baseline (relative)
-    dev = ((velocities - velocities(:, 1)) ./ velocities(:, 1)) * 100; % [%]
 
     if isempty(dev)
         log = "empty dev: "
@@ -827,8 +828,8 @@ function visualise_velocity(subjects, hmd_data)
 
     y_data = mean(dev)';
     ers = std(dev)';
-    fig_title = "relative-vel-dev-from-baseline";
-    yl = "vel Deviation from the Baseline relative [%]";
+    fig_title = "Average-Relative-Velocity-Deviation";
+
 
     create_bar_plot("mean", y_data, x_labels, ers, fig_title, xl, yl);
         
@@ -1003,7 +1004,7 @@ function visualise_adaptation(params)
     xl = "Condition";
     yl = "Mean Step Frequency [steps/min]";
 
-    create_bar_plot(subjects, data, conds', ers, fig_title, xl, yl)
+    % create_bar_plot(subjects, data, conds', ers, fig_title, xl, yl)
 
     % -------- divergence from baseline relative to mean (%)
     fig_title = "Relative-Step-Frequency-Divergence";
@@ -1044,13 +1045,23 @@ function visualise_adaptation(params)
 
     create_bar_plot(subjects, d, c, s, fig_title, xl, yl)
 
-    % ----- pf deviation
-    fig_title = "Peak-Force-Deviation"
-    d = pf_divergence';
+    % ----- relative pf deviation
+    pf_baselines = repmat(mpf(:, 2), 1, n_conditions);
+    pf_rel_data = (pf_divergence' ./ pf_baselines') * 100;
+
+    fig_title = "Relative-Peak-Force-Deviation";
+    d = pf_rel_data;
     s = [];
+    yl = "Relative Peak Force Deviation [% baseline]";
 
     create_bar_plot(subjects, d, c, s, fig_title, xl, yl)
 
+    % -- mean relative pf deviation
+    fig_title = "Average-Peak-Force-Deviation";
+    d = mean(pf_rel_data, 2);
+    s = std(pf_rel_data, 0, 2);
+
+    create_bar_plot("mean", d, c, s, fig_title, xl, yl)
 end
 
 function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
@@ -1109,8 +1120,4 @@ end
 %% Testing
 clearvars
 
-% sd = read_sole_data(4, true);
-% cd = sd.vh
-step_freq_adaptation_conditions(4:10, [], true)
-
-% sd.s4.br
+show_analysis(4:10)
