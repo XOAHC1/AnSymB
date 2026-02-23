@@ -183,7 +183,6 @@ end
 function hmd_data = read_subject_hmd_data(subject)
 
     HMD_CONDITIONS = ["Baseline", "very weak", "weak", "heavy", "very heavy"];
-    % HMD_CONDITIONS = ["Baseline", "very weak", "weak"];
     CONDITIONS = ["bvr", "vw", "w", "h", "vh"];
 
     hmd_data = struct();
@@ -641,16 +640,21 @@ function trial_result = analyse_hmd_trial(trial)
     trial_result = struct();
 
     % remove start (by moving)
-    start_pos_x = trial(1, 3);
     raw_pos_x = trial(:, 3);
+    start_pos_x = min(raw_pos_x);
+    end_pos_x = max(raw_pos_x);
 
-    start_puffer = 0.2;          %m
+    goal_radius = 0.20;          %m
 
+    close_to_start = diff([abs(raw_pos_x - start_pos_x) > goal_radius]);
+    close_to_end = diff([abs(raw_pos_x - end_pos_x) < goal_radius]);
 
+    walking_start = find(close_to_start, 1, "last");
+    walking_end = find(close_to_end, 1, "first");
 
-
-    idcs = abs(raw_pos_x - start_pos_x) > start_puffer;
-    if sum(idcs) < 100
+    idcs = walking_start:walking_end;
+    % idcs = abs(raw_pos_x - start_pos_x) > goal_radius;
+    if numel(idcs) < 100
         n_timesteps = sum(idcs)
     end
     trial = trial(idcs, :);
@@ -1158,6 +1162,4 @@ end
 
     
 %% Testing
-% clearvars
-% d = read_sole_data(4:10, true);
-show_analysis(4:10, d)
+clearvars
