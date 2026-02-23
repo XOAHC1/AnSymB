@@ -65,10 +65,14 @@ function condition_sole_data = read_condition_sole_data(subject, condition, manu
     condition_sole_data.data = data;
     condition_sole_data.experiment_time = dt;
     condition_sole_data.steps = get_steps(data);
+
     if further_analysis
-        [condition_sole_data.trials, msf, std_freq] = get_trials(condition_sole_data, manual_trial_params);
-        condition_sole_data.mean_step_freq = msf;
-        condition_sole_data.std_step_freq = std_freq;
+        [condition_sole_data.trials, ...
+        condition_sole_data.mean_step_freq, ...
+        condition_sole_data.std_step_freq, ...
+        condition_sole_data.mean_peak_force, ...
+        condition_sole_data.peak_force_std, ...
+        ] = get_trials(condition_sole_data, manual_trial_params);
     end
 
 
@@ -137,7 +141,12 @@ function sole_data = read_sole_data(subjects, use_manual_trial_borders)
 end
 
 % Read in HMD Data (one condition)
-function [mean_vel, mean_acc, max_vel, max_acc, hmd_data] = read_condition_hmd_data(subject, condition)
+function [mean_vel, mean_acc, max_vel, max_acc, hmd_data] = read_condition_hmd_data(subject, condition, choosen_trials)
+
+    if nargin < 3 || isempty(choosen_trials)
+        % set to 10 to get only "uncrashed" conditions, 20 to get all
+        choosen_trials = 20;
+    end
 
     % Read Data
     hmd_data = struct();
@@ -149,7 +158,7 @@ function [mean_vel, mean_acc, max_vel, max_acc, hmd_data] = read_condition_hmd_d
     % get first analysis
     trial_number = data(:, 2);
     
-    for i = 1:20
+    for i = 1:choosen_trials
         idcs = trial_number == i;
         if sum(idcs) == 0
             continue
@@ -345,7 +354,7 @@ function step_type = step_type(step)
 end
 
 % analyse trials in the data
-function [trials, mean_step_freq, freq_std] = get_trials(condition_data, manual_trial_params)
+function [trials, mean_step_freq, freq_std, mean_peak_force, peak_force_std] = get_trials(condition_data, manual_trial_params)
 
     % Input: 
     %   trial_data:
@@ -427,6 +436,7 @@ function [trials, mean_step_freq, freq_std] = get_trials(condition_data, manual_
     trials = struct(...
         'start',            {}, ...
         'duration',         {}, ...
+        'mean_peak_force',      {}, ...
         'n_steps',          {}, ...
         'step_period',      {}, ...
         'step_period_std',  {}, ...
@@ -442,7 +452,8 @@ function [trials, mean_step_freq, freq_std] = get_trials(condition_data, manual_
     
     mean_step_freq = sum([trials.step_freq] .* [trials.n_steps]) / sum([trials.n_steps]);
     freq_std = std([trials.step_freq]);
-
+    mean_peak_force = sum([trials.mean_peak_force] .* [trials.n_steps]) / sum([trials.n_steps]);
+    peak_force_std = std([trials.mean_peak_force]);
 end
 
 function trial = analyse_trial(trial_data)
@@ -547,9 +558,15 @@ function trial = analyse_trial(trial_data)
     
     step_freq = 60 / step_period;       % Steps per minute
 
+    % peak forces
+    
+    mean_peak_force = mean(cat(2, [trial_steps.right.peakForce], [trial_steps.left.peakForce]));
+
+
     % write attributes in return structure
     trial(1).start = trial_start_time;
     trial.duration = trial_duration;
+    trial.mean_peak_force = mean_peak_force;
     trial.n_steps = numel(step_diffs) + 1;
     trial.step_period = step_period;
     trial.step_period_std = step_std;
@@ -888,7 +905,7 @@ function step_freq_adaptation = step_freq_adaptation_trials(subject, d, visualis
 end
 
 % step_freq development over crowd density
-function params = step_freq_adaptation_conditions(subjects, d, visualise)
+function step_freq_adaptation_conditions(subjects, d, visualise)
     
         % return struct:
         %   matrix with dims: 
@@ -922,13 +939,14 @@ function params = step_freq_adaptation_conditions(subjects, d, visualise)
     n_subjects = numel(subjects);
 
     % return matrix
-    params = zeros(n_subjects, n_conditions, 6);
+    params = zeros(n_subjects, n_conditions, 9);
 
     for s_idx = 1:n_subjects
         s = subjects(s_idx);
         % get subject data
         sd = d.("s"+s);
         bl_step_freq = sd.bvr.mean_step_freq;
+        bl_peak_force = sd.bvr.mean_peak_force;
 
         % for each condition, get step_freq, std in condition, difference to mean
         for c_idx = 1:n_conditions
@@ -942,6 +960,9 @@ function params = step_freq_adaptation_conditions(subjects, d, visualise)
                 sd.(cond).std_step_freq, ...     % ssf
                 sd.(cond).mean_step_freq - bl_step_freq, ...
                 subjects(s_idx), ...
+                sd.(cond).mean_peak_force, ...
+                sd.(cond).peak_force_std, ...
+                sd.(cond).mean_peak_force - bl_peak_force, ...
             ];
 
         end
@@ -949,19 +970,14 @@ function params = step_freq_adaptation_conditions(subjects, d, visualise)
 
     if visualise
         % t = "aufgerufen"
-        visualise_adaptation(params, "condition-adaptation");
+        visualise_adaptation(params);
     end
 
 end
 
 % visualise step_freq adaptation to scenarios. 
 % params: matrix, (:, 1) -> conditions, (:, 2) -> sfs
-function visualise_adaptation(params, fig_title)
-
-    if nargin < 2 
-        title = "sf adaptation";
-    end
-
+function visualise_adaptation(params)
 
     conditions = ["br", "bvr", "vw", "w", "h", "vh"];
     n_conditions = numel(conditions);
@@ -973,10 +989,15 @@ function visualise_adaptation(params, fig_title)
     msfs = params(:, :, 3);
     stds = params(:, :, 4);
     divergence = params(:, :, 5);
-    subjects = params(:, :, 6);
-    subjects = subjects(:, 1);
+    subjects = params(:, 1, 6);
+    mpf = params(:, :, 7);
+    pfstd = params(:, :, 8);
+    pf_divergence = params(:, :, 9);
+
+    
 
     % --- grouped by condition, split by subject
+    fig_title = "Step-Frequencies-by-condition";
     data = msfs';
     ers = stds';
     xl = "Condition";
@@ -985,32 +1006,50 @@ function visualise_adaptation(params, fig_title)
     create_bar_plot(subjects, data, conds', ers, fig_title, xl, yl)
 
     % -------- divergence from baseline relative to mean (%)
+    fig_title = "Relative-Step-Frequency-Divergence";
     baselines = repmat(msfs(:, 2), 1, n_conditions);
     rel_data = (divergence' ./ baselines') * 100;
     yl = "step frequency divergence from baseline [% of baseline]";
 
 
-    create_bar_plot(subjects, rel_data, conds', [], "diveregence-from-baseline-relative-to-baseline", xl, yl)
+    create_bar_plot(subjects, rel_data, conds', [], fig_title, xl, yl)
 
     % --- divergence from bl relative to mean, mean over subjects
+    fig_title = "Mean-Relative-Step-Frequency-Divergence";
     d = mean(rel_data, 2);
     c = conds(1, :);
     s = std(rel_data, 0, 2);
 
-    create_bar_plot("mean", d, c, s, "mean-divergence-from-mean-step-freq", xl, yl);
+    create_bar_plot("mean", d, c, s, fig_title, xl, yl);
 
     % ---- divergence, sorted by sequence ----
+    % sort data
     [~, idcs] = sort(seq');
-    % seq_data = rel_data(idcs)
-
     cols = repmat(1:size(rel_data,2), size(rel_data,1), 1);
     seq_data = rel_data(sub2ind(size(rel_data), idcs, cols));
 
+    fig_title = "Mean-Relative-Step-Frequency-Divergence-by-Sequence"; 
     d = mean(seq_data, 2);
     s = std(seq_data, 0, 2);
+    xl = "Place in Sequence";
 
-    create_bar_plot("mean", d, 1:numel(d), s, "sf-mean-dev-sorted-by-sequence", xl, yl);
+    create_bar_plot("mean", d, 1:numel(d), s, fig_title, xl, yl);
 
+    % ----- peak forces -----
+    fig_title = "Peak-Forces";
+    d = mpf';
+    s = pfstd';
+    xl = "Conditions";
+    yl = "Peak Forces";
+
+    create_bar_plot(subjects, d, c, s, fig_title, xl, yl)
+
+    % ----- pf deviation
+    fig_title = "Peak-Force-Deviation"
+    d = pf_divergence';
+    s = [];
+
+    create_bar_plot(subjects, d, c, s, fig_title, xl, yl)
 
 end
 
@@ -1044,12 +1083,13 @@ function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
     xticklabels(x_labels)
     xlabel(xl)
     ylabel(yl)
-    legend("s "+ subjects)
+    legend("s "+ string(subjects), 'Location', 'southoutside', 'Orientation', 'horizontal');
+
     title(fig_title)
 
     if save
-        filename = "figures\" + fig_title + ".pdf";
-        saveas(fig, filename);
+        filename = "figures\" + fig_title + ".jpg";
+        exportgraphics(fig, filename);
     end
 end
 
@@ -1069,5 +1109,8 @@ end
 %% Testing
 clearvars
 
-show_analysis()
+% sd = read_sole_data(4, true);
+% cd = sd.vh
+step_freq_adaptation_conditions(4:10, [], true)
 
+% sd.s4.br
