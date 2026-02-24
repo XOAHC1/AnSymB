@@ -125,7 +125,7 @@ end
 function sole_data = read_sole_data(subjects, use_manual_trial_borders)
 
     if nargin < 1 || isempty(subjects)
-        subjects = 4:8;
+        subjects = 4:13;
     end
 
     if nargin < 2 || isempty(use_manual_trial_borders)
@@ -525,7 +525,7 @@ function trial = analyse_trial(trial_data)
     % ----- Outlier removal ------
 
     % how many stds difference from mean are ok
-    TOLERANCE = 1.5;
+    TOLERANCE = 1.8;
 
     % remove from the front
     while numel(step_diffs) > 1 && abs(step_diffs(1) - step_period) > TOLERANCE * step_std
@@ -1146,7 +1146,7 @@ end
 function show_analysis(subjects, sd)
     
     if nargin < 1 || isempty(subjects)
-        subjects = 4:9;
+        subjects = 4:13;
     end
 
     if nargin < 2 || isempty(sd)
@@ -1161,5 +1161,8 @@ function show_analysis(subjects, sd)
 end
 
     
+% S 14 Is not save for analysis
 %% Testing
 clearvars
+
+show_analysis()
