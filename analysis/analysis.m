@@ -622,7 +622,7 @@ function manually_mark_subject_trials(subject, special_conditions, skip_conditio
         skip_conditions = [];
     end
 
-    classical_conditions = ["br", "bvr", "vw", "w", "h", "vh"];
+    classical_conditions = ["vh"];
 
     conditions = cat(2, classical_conditions, special_conditions);
 
@@ -1165,6 +1165,5 @@ end
 %% Testing
 clearvars
 
-% manually_mark_subject_trials(19)
-% manually_mark_subject_trials(20)
-% manually_mark_subject_trials(21)
+
+show_analysis([4:13, 15:21])
