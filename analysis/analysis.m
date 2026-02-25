@@ -1101,7 +1101,7 @@ end
 
 function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
     
-    save = true;
+    save = false;
 
     error_bars = true;
     if nargin < 4 || isempty(ers)
