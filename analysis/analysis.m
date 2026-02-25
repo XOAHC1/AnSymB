@@ -1165,4 +1165,6 @@ end
 %% Testing
 clearvars
 
-show_analysis()
+% manually_mark_subject_trials(19)
+% manually_mark_subject_trials(20)
+% manually_mark_subject_trials(21)
