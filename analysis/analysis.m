@@ -145,7 +145,7 @@ function [mean_vel, mean_acc, max_vel, max_acc, hmd_data] = read_condition_hmd_d
 
     if nargin < 3 || isempty(choosen_trials)
         % set to 10 to get only "uncrashed" conditions, 20 to get all
-        choosen_trials = 20;
+        choosen_trials = 10;
     end
 
     % Read Data
@@ -525,7 +525,7 @@ function trial = analyse_trial(trial_data)
     % ----- Outlier removal ------
 
     % how many stds difference from mean are ok
-    TOLERANCE = 1.8;
+    TOLERANCE = 2;
 
     % remove from the front
     while numel(step_diffs) > 1 && abs(step_diffs(1) - step_period) > TOLERANCE * step_std
@@ -1056,6 +1056,14 @@ function visualise_adaptation(params)
 
         create_bar_plot(subjects, d, c, s, fig_title, xl, yl)
 
+    %  % ----- rel peak force STDs ----
+    %     fig_title = "Peak-Force-std";
+    %     d =  mean((pfstd ./ mpf));
+    %     s = [];
+    %     yl = "Standard Deviation Relative to Value";
+
+    %     create_bar_plot(subjects, d, c, s, fig_title, xl, yl)
+
      % ----- relative pf deviation
         pf_baselines = repmat(mpf(:, 2), 1, n_conditions);
         pf_rel_data = (pf_divergence' ./ pf_baselines') * 100;
@@ -1115,6 +1123,7 @@ function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
 
     fig = figure("Name", fig_title);
     b = bar(data);
+    grid("on")
 
     if error_bars
         hold on
@@ -1132,7 +1141,7 @@ function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
 
     % remove legend if inpractical
     if n_subjects > 1 && n_subjects < 12
-    legend("s "+ string(subjects), 'Location', 'southoutside', 'Orientation', 'horizontal');
+    legend("s "+ string(subjects), 'Location', 'southoutside', 'Orientation', 'horizontal', 'NumColumns', 5);
     end
 
     title(fig_title)
@@ -1163,7 +1172,9 @@ end
     
 % S 14 Is not save for analysis
 %% Testing
-clearvars
+% clearvars
 
+% sd = read_sole_data([4:13, 15:21], true);
+show_analysis([4:13, 15:21], sd)
 
-show_analysis([4:13, 15:21])
+% visualise_velocity([4:13, 15:21])
