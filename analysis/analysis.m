@@ -1009,7 +1009,7 @@ function visualise_adaptation(params)
     
     %  -------------- Plots --------------
      % --- grouped by condition, split by subject
-        fig_title = "Step-Frequencies-by-condition";
+        fig_title = "Step Frequencies by Condition";
         data = msfs';
         ers = stds';
         xl = "Condition";
@@ -1018,16 +1018,16 @@ function visualise_adaptation(params)
         create_bar_plot(subjects, data, conds', ers, fig_title, xl, yl)
 
      % -------- divergence from baseline relative to mean (%)
-        fig_title = "Relative-Step-Frequency-Divergence";
+        fig_title = "Relative Step Frequency Divergence";
         baselines = repmat(msfs(:, 2), 1, n_conditions);
         rel_data = (divergence' ./ baselines') * 100;
-        yl = "step frequency divergence from baseline [% of baseline]";
+        yl = "step frequency divergence from baseline [% bvr]";
 
 
         create_bar_plot(subjects, rel_data, conds', [], fig_title, xl, yl)
 
      % --- divergence from bl relative to mean, mean over subjects
-        fig_title = "Mean-Relative-Step-Frequency-Divergence";
+        fig_title = "Mean Relative Step Frequency Divergence";
         d = mean(rel_data, 2);
         c = conds(1, :);
         s = std(rel_data, 0, 2);
@@ -1040,7 +1040,7 @@ function visualise_adaptation(params)
         seq_data = rel_data(sub2ind(size(rel_data), idcs, cols));
         
      % ---- divergence, sorted by sequence ----
-        fig_title = "Mean-Relative-Step-Frequency-Divergence-by-Sequence"; 
+        fig_title = "Mean Relative Step Frequency Divergence by Sequence"; 
         d = mean(seq_data, 2);
         s = std(seq_data, 0, 2);
         xl = "Place in Sequence";
@@ -1068,7 +1068,7 @@ function visualise_adaptation(params)
         pf_baselines = repmat(mpf(:, 2), 1, n_conditions);
         pf_rel_data = (pf_divergence' ./ pf_baselines') * 100;
 
-        fig_title = "Relative-Peak-Force-Deviation";
+        fig_title = "Relative Peak Force Deviation";
         d = pf_rel_data;
         s = [];
         yl = "Relative Peak Force Deviation [% baseline]";
@@ -1076,14 +1076,14 @@ function visualise_adaptation(params)
         create_bar_plot(subjects, d, c, s, fig_title, xl, yl)
 
      % -- mean relative pf deviation
-        fig_title = "Average-Peak-Force-Deviation";
+        fig_title = "Average Peak Force Deviation";
         d = mean(pf_rel_data, 2);
         s = std(pf_rel_data, 0, 2);
 
         create_bar_plot("mean", d, c, s, fig_title, xl, yl)
 
      % -- steps per trial
-        fig_title = "Steps-per-Trial";
+        fig_title = "Steps per Trial";
         d = steps_per_trial';
         c = conds';
         s = std_steps_per_trial';
@@ -1098,10 +1098,10 @@ function visualise_adaptation(params)
         relative_step_dev = (steps_per_trial ./ bl_steps - 1) * 100;
 
      % -- average relative deviation n_steps
-        fig_title = "Average-Deviation-Steps-per-Trial";
+        fig_title = "Average Deviation Steps per Trial";
         d = mean(relative_step_dev)';
         s = std(relative_step_dev, 0, 1)';
-        yl = "Average Deviation n Steps [% of baseline]";
+        yl = "Average Deviation Steps per Trial [% bvr]";
 
         create_bar_plot("mean", d, c, s, fig_title, xl, yl)
 
@@ -1109,7 +1109,7 @@ end
 
 function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl)
     
-    save = false;
+    save = true;
 
     error_bars = true;
     if nargin < 4 || isempty(ers)
