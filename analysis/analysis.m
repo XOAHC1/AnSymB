@@ -555,7 +555,7 @@ function trial = analyse_trial(trial_data)
     step_period = mean(step_diffs);     % Seconds per step
     step_std = std(step_diffs);
     
-    step_freq = 60 / step_period;       % Steps per minute
+    step_freq = 1 / step_period;       % Steps per minute
 
     % peak forces
     
@@ -1013,7 +1013,7 @@ function visualise_adaptation(params)
         data = msfs';
         ers = stds';
         xl = "Condition";
-        yl = "Mean Step Frequency [steps/min]";
+        yl = "Mean Step Frequency [Hz]";
 
         create_bar_plot(subjects, data, conds', ers, fig_title, xl, yl)
 
