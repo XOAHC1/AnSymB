@@ -818,9 +818,9 @@ function visualise_velocity(subjects, hmd_data, sequence)
     y_data = velocities';
     x_labels = ["bvr", "vw", "w", "h", "vh"];
     ers = [];
-    fig_title = "Velocity in Conditions";
+    fig_title = "Velocity";
     xl = "Conditions";
-    yl = "Velocity [m/s]";
+    yl = "Velocity";
 
     create_bar_plot(subjects, y_data, x_labels, ers, fig_title, xl, yl);
 
@@ -859,7 +859,7 @@ function visualise_velocity(subjects, hmd_data, sequence)
         ers = std(seq_vel_dev, 0, 2);
         xl = "Place in Sequence";
 
-        create_bar_plot("mean", d, 1:5, ers, fig_title, xl, yl);
+        create_bar_plot("mean", d, 2:6, ers, fig_title, xl, yl);
 
     end
         
@@ -1179,7 +1179,7 @@ function create_bar_plot(subjects, data, x_labels, ers, fig_title, xl, yl, bl)
     if nargin < 8 || isempty(bl)
         bl = 0;
     end
-    save = false;
+    save = true;
 
     error_bars = true;
     if nargin < 4 || isempty(ers)
@@ -1250,4 +1250,3 @@ end
 % sd = read_sole_data([4:13, 15:21], true);
 show_analysis([4:13, 15:21], sd)
 
-% visualise_velocity([4:13, 15:21])
